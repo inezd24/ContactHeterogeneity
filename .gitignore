@@ -1,0 +1,17 @@
+# RStudio / R session files
+.Rproj.user/
+.Rhistory
+.Rout
+.RData
+.Ruserdata
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Pipeline output directories created at runtime under LOCAL_ROOT_DIR
+# (kept out of version control - regenerate by running the pipeline)
+Net_Sens/
+Outfiles/
+Plots/
+SLURM/
