@@ -1,15 +1,18 @@
 # GraphComparison
 
-Code accompanying the manuscript benchmarking synthetic network generators (spatial/random, SBM, DCSBM, ERM, NCRG) against empirical dog-contact networks from four locations, and evaluating how well each generator reproduces rabies (SEIR) and generic (SIS) outbreak dynamics on those networks. Submitted to *PLOS Computational Biology*.
+Code accompanying the manuscript comparing five synthetic network generators (SBM, DCSBM, ERM, NCRG, SENCA from Laager et al., 2018) against empirical dog-contact networks from four locations, and evaluating how well each generator reproduces rabies (SEIR) and generic (SIS) outbreak dynamics on those networks. Submitted to *PLOS Computational Biology*.
 
 **Author:** Inez Derkx (inez.derkx@swisstph.ch)
 
+**Date:** September 2026
+
 ## Status of this code
 
-This repository contains the analysis scripts exactly as they were run on the author's HPC cluster to produce the results reported in the manuscript. **No line of R or shell code has been edited, corrected, or "cleaned up"** — only file *locations* have changed (everything has been moved into a single `src/` folder) and this README, the license, and `.gitignore` have been added. This matters because even small code edits (e.g. touching random-number handling, argument parsing, or file I/O) could change downstream numerical results, so nothing beyond reorganization was done. Two consequences of this:
+This repository contains the analysis scripts exactly as they were run on my HPC cluster to produce the results reported in the manuscript. **No line of R or shell code has been edited, corrected, or "cleaned up"** — only file *locations* have changed. In comparison to my local versions, the following comments should be noted:
 
-1. A few scripts (see [Known cosmetic quirks](#known-cosmetic-quirks) below) contain leftover comments/strings from earlier file names or generic copy-pasted header descriptions. These are harmless and have been left as-is.
-2. The scripts contain **hardcoded, machine-specific paths** to the author's HPC account (see [Adapting paths to your own system](#adapting-paths-to-your-own-system)). These must be edited by anyone who wants to actually *execute* the pipeline elsewhere. Editing these paths does not change any computation — it only tells R and SLURM where to read/write files — but to keep the "unchanged code" guarantee airtight, that edit has intentionally been left for the user to make rather than done here.
+1. All analyses for the original manuscript were run on University of Basel's sciCORE HPC using SLURM. Both the .R and .sh files are included in this repository.
+2. A few scripts (see [Known cosmetic quirks](#known-cosmetic-quirks) below) contain leftover comments/strings from earlier file names or generic copy-pasted header descriptions. These are harmless and have been left as-is.
+3. The scripts contain **hardcoded, machine-specific paths** to my HPC account (see [Adapting paths to your own system](#adapting-paths-to-your-own-system)). These must be edited by anyone who wants to actually *execute* the pipeline elsewhere. Editing these paths does not change any computation — it only tells R and SLURM where to read/write files — but to keep the "unchanged code" guarantee airtight, that edit has intentionally been left for the user to make rather than done here.
 
 ## Repository structure
 
@@ -46,7 +49,7 @@ Each `.R`/`.sh` pair is kept **in the same folder** on purpose: the SLURM script
 
 ## Pipeline / execution order
 
-Step numbers match the file name prefixes as provided (the sequence jumps from `07` to `10` — there is no `08`/`09`; nothing is missing). Scripts without a `.sh` file were run as single (non-array) jobs.
+Step numbers match the file name prefixes as provided (the sequence jumps from `07` to `10` — there is no `08`/`09`; nothing is missing, this is an artifact from previous changes in analyses). Scripts without a `.sh` file were run as single (non-array) jobs, usually in a medium-sized session on a single node with 16 cores. 
 
 | Step | Script(s) | What it does | SLURM array |
 |---|---|---|---|
@@ -67,8 +70,6 @@ Step numbers match the file name prefixes as provided (the sequence jumps from `
 | — | `optimal_bandwidth.R` | Kernel-density bandwidth-selection sensitivity analysis, added later as an additional check; run standalone alongside the plotting scripts. | — |
 | — | `manuscript_plots.R` | Generates the main-text manuscript figures from the pipeline outputs above. | — |
 | — | `manuscript_SI_plots.R` | Generates the Supplementary Information figures. | — |
-
-> The one-line descriptions above were written by reading each script's code (many of the in-file header comments are generic/copy-pasted and don't reflect what that particular script does) — worth double-checking against your own knowledge of the pipeline before this goes out to reviewers.
 
 ## Software environment
 
