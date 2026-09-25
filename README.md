@@ -26,7 +26,6 @@ GraphComparison/
 │   └── README.md            # what input data the pipeline expects (not included; see Data availability)
 └── src/
     ├── 00_constructNetworksFunction.R   # reference copy of shared helper functions
-    ├── 00_constructNetworksFunction.RData
     ├── 01_NetworkGeneratorComparison.R/.sh
     ├── 01a_Run_NCRG.R/.sh
     ├── 02_collectGraphs.R
@@ -34,15 +33,10 @@ GraphComparison/
     ├── 03b_SEIR_Factorial.R/.sh
     ├── 04a_SIS_Randomized.R/.sh
     ├── 04b_SIS_Factorial.R/.sh
-    ├── 05_Graph_Plotting.R/.sh
     ├── 06_Graphs_Other_Locations.R/.sh
     ├── 07_collectGraphsOtherLocations.R
-    ├── 10_Graph_Scaling.R/.sh
-    ├── 11_Process_Scaled_Graphs.R/.sh
-    ├── 12_Sub_Graphs.R
     ├── manuscript_plots.R
-    ├── manuscript_SI_plots.R
-    └── optimal_bandwidth.R
+    └── manuscript_SI_plots.R
 ```
 
 Each `.R`/`.sh` pair is kept **in the same folder** on purpose: the SLURM scripts call `Rscript <script_name>.R` using a bare filename, which only resolves correctly if the shell script is submitted (`sbatch`) from inside the same directory the `.R` file lives in. This is why they are not separated into an 'src/' and 'slurm/' folder. 
@@ -61,10 +55,8 @@ Step numbers match the file name prefixes as provided. Scripts without a `.sh` f
 | 3b | `03b_SEIR_Factorial.R/.sh` | SEIR simulations under a full factorial parameter design. | 0–9999 |
 | 4a | `04a_SIS_Randomized.R/.sh` | SIS outbreak simulations, randomly sampled parameters. | 0–999 |
 | 4b | `04b_SIS_Factorial.R/.sh` | SIS simulations, factorial design. | 0–9999 |
-| 5 | `05_Graph_Plotting.R/.sh` | Summarizes and plots the outbreak-simulation outputs (SEIR/SIS × Randomized/Factorial). | 0–3 (one per model/type combination) |
 | 6 | `06_Graphs_Other_Locations.R/.sh` | Repeats the Step 1 network-generation comparison for the three additional empirical locations. | 1–5000 |
 | 7 | `07_collectGraphsOtherLocations.R` | Aggregates Step 6's outputs across the additional locations (companion to Step 2). | — (single run) |
-| — | `optimal_bandwidth.R` | Kernel-density bandwidth-selection sensitivity analysis, added as an additional check; run standalone alongside the plotting scripts. | — |
 | — | `manuscript_plots.R` | Generates the main-text manuscript figures from the pipeline outputs above. | — |
 | — | `manuscript_SI_plots.R` | Generates the Supplementary Information figures. | — |
 
@@ -94,7 +86,6 @@ Every script sets an absolute working directory before doing anything else, and 
 | `03b_SEIR_Factorial.R` | 25 | `LOCAL_ROOT_DIR` (`GRAPH_FILE` is passed in from the `.sh` script instead) |
 | `04a_SIS_Randomized.R` | 26, 257 | `LOCAL_ROOT_DIR`; a hardcoded `vetted_graphs_...rds` fallback path |
 | `04b_SIS_Factorial.R` | 25 | `LOCAL_ROOT_DIR` (`GRAPH_FILE` passed in from the `.sh` script) |
-| `05_Graph_Plotting.R` | 48–49 | `setwd(...)`; `files_directory` |
 | `06_Graphs_Other_Locations.R` | 20, 35 | `.libPaths(...)`; `LOCAL_ROOT_DIR` |
 | `07_collectGraphsOtherLocations.R` | 3 | `file_dir` |
 | `manuscript_plots.R` | 37, 46 | `LOCAL_ROOT_DIR`; `files_directory` |
