@@ -1,14 +1,10 @@
 ###########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
-# Created: 01 December 2025; Last edited: 03 December 2025
-# Script compares different network construction algorithms
-
-# Legend of script:
-
-### IS FOR NEW SECTIONS IN CAPITAL ###
-### Is for headings (e.g., a new function)
-# is for 'small' commands (e.g., rename or merge)
+# Created: December 2025; Last edited: September 2025
+# This script acts as a repository for helper function used throughout analyses. In their current form, the remaining 
+# scripts do not use 'source()' to call these functions, but call them locally. You may adapt this as desired. Please note
+# that the functions are well described here, but not elsewhere.
 
 ##########################################################################################################################
 
@@ -29,16 +25,17 @@ library(patchwork)
 library(ggcorrplot)
 library(lhs)
 
-
 ##########################################################################################################################
 
 ### Helper functions
 
-# 1. Make empirical network: this is the basis of our comparisons and is zone-based data
+# 1. Make empirical network: this function takes an edgelist and turns it into a basic igraph graph object. 
 empirical_net <- function(df){
   
   # Function generates a simple network from a dataframe with variables 'dog' and 'peer' as edgelist components
-  # @param: 'df': dataframe that can be used as edgelist and has the columns 'dog' and 'peer'
+  # It does not care whether interactions are weighted, repeated, or else, as it will turn the edgelist into 
+  # an undirected, unweighted graph. 
+  # @param: 'df': dataframe that can be used as edgelist and has the columns 'dog' and 'peer'. 
   # Necessary packages: igraph
   
   cat("\nStarting with construction of empirical graph.\n")
@@ -52,7 +49,8 @@ empirical_net <- function(df){
   
   # If it is is not a simple (undirected, unweighted) graph, turn it into one 
   if (!is_simple(graph)){ 
-    cat("Converting graph to simple graph.\n")
+    cat("Graph is not simple. Converting graph to simple graph.\n")
+    cat("Ensure that you check graph for any potential issues after simplifying.\n")
     graph <- igraph::simplify(graph)
   } 
   
@@ -76,18 +74,33 @@ empirical_net <- function(df){
 
 # 2. Helper function to compute the Degree Distribution
 calculate_degree_distribution <- function(graph) {
+  
+  # Function returns a dataframe with empirical degree PMF
+  # @param: 'graph': any igraph grpah object. If you use a different graph 
+  # type, make sure to convert it to an igraph object. 
+  # Necessary packages: igraph
+
+  # Save the degrees of the nodes in the graph
   degrees <- degree(graph)
   
-  # Calculate the frequency (Probability Mass Function, PMF)
+  # Calculate the frequency of degree categories
   dist_table <- table(degrees)
+
+  # Calculate probability
   dist_pmf <- dist_table / sum(dist_table)
   
-  # Return a dataframe/vector mapping degree value to probability
+  # Return a dataframe mapping degree value to probability
   return(as.data.frame(dist_pmf))
 }
 
 # 3. Distance statistic 1: Kolmogorov-Smirnov (KS) Distance
 ks_distance <- function(synthetic_degrees, empirical_degrees) {
+
+  # Function calculates the Kolmogorov-Smirnov distance between two 
+  # degree distributions
+  # @param: 'synthetic_degrees': degree distribution of other graph
+  # @param: 'empirical_degrees': degree distribution of reference graph
+  # Necessary packages: igraph, stats (for ecdf)
   
   # Convert degrees to ECDFs (Empirical Cumulative Distribution Function)
   ecdf_synth <- ecdf(synthetic_degrees)
@@ -98,11 +111,19 @@ ks_distance <- function(synthetic_degrees, empirical_degrees) {
   
   # Calculate the maximum vertical difference between the two CDFs
   ks_dist <- max(abs(ecdf_synth(all_degrees) - ecdf_emp(all_degrees)))
+
+  # Return KS distance
   return(ks_dist)
 }
 
 # 4. Distance statistic 2: Chi-Squared (χ²) Distance
 chi2_distance <- function(synth_df, emp_df) {
+
+  # Function calculates the Chi-Squared (χ²) distance between two 
+  # degree distributions. Requires output from helper function 2. 
+  # @param: 'synth_df': df of degrees and probability of other graph
+  # @param: 'emp_df': df of degrees and probability of reference graph
+  # Necessary packages: /
   
   # Standardize column names
   colnames(synth_df) <- c("degree", "P_synth")
