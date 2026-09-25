@@ -1,16 +1,18 @@
 ###########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
-# Created: 10.03.2026
-# Script to plot functions for manuscript from previously generated data
+# Created: March 2026; Last edited: September 2026
+# This script creates the exact plots and tables used in the manuscript
 
-# Legend of script:
+# Important notes:
+# 1. The images are manually saved by date, e.g. "Figure1_27_05_26.png". If you want, you can automate this for some form
+#    of version control. I prefer doing it manually.
+# 2. The ordering and naming of the graphs is very important here. It appears it may not always be consistent across graphs,
+#    but the result is that all images use the same graph type naming and alphabetical order. Please do not change this. 
+# 3. After saving each plot, the script removes large input files and the plots themselves for efficient memory use. Comment
+#    those script lines if you want to inspect the plots within the environment. 
 
-### IS FOR NEW SECTIONS IN CAPITAL ###
-### Is for headings (e.g., a new function)
-# is for 'small' commands (e.g., rename or merge)
-
-################################################################################
+##########################################################################################################################
 
 ### SET UP R ENVIRONMENT ###
 
@@ -18,18 +20,15 @@
 rm(list = ls())
 
 # Load required libraries
-library(dplyr) # data wrangling
-library(tidyr) # data wrangling
-library(purrr) # data opening
-library(ggplot2) # for plotting
-library(readr) # for opening the csv files
-library(ggh4x) # for the faceting
-library(scales) # for comma in 30,000
-library(egg) # for faceting
-library(ggtext) # for font labels
-library(igraph) # graph object
-library(ggraph) # for igraph plotting
-library(cowplot) # for putting graphs together
+library(dplyr)  
+library(tidyr) 
+library(ggplot2)  
+library(readr)   
+library(ggh4x)   
+library(scales)   
+library(igraph)  
+library(ggraph)  
+library(cowplot)  
 library(data.table)
 library(forcats)
 
@@ -45,7 +44,66 @@ ifelse(!dir.exists(out_path),
 # Directory of files
 files_directory <- "/scicore/home/chitnis/derkx0000/GraphComparison/Outfiles/"
 
-################################################################################
+##########################################################################################################################
+
+### Helper functions
+
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 1: find local maxima in outbreak data
+find_outbreak_threshold_sensitive <- function(values, adjust_bw) {
+
+  # This function finds the local maxima in our outbreak data. 
+  # See the 'optimal_bandwidth.R' script for a thorough analysis
+  #' @param 'values'
+  #' @param 'adjust_bw': value to adjust bandwidth for sensitivity
+  
+  # 1. Basic cleaning
+  values <- na.omit(values)
+  if(length(unique(values)) < 5) return(0.05)
+  
+  # 2. Set sensitivity using a small 'adjust' value
+  dens <- density(values, adjust = adjust_bw, from = 0, to = 1)
+  
+  # 3. Find peaks (local maxima)
+  #    A point is a peak if it's higher than its two neighbors
+  is_peak <- diff(sign(diff(dens$y))) == -2
+  peaks <- which(is_peak) + 1
+  
+  # 4. Filter peaks: Ignore tiny "wiggles" by requiring peaks to be a certain 
+  #    percentage of the maximum density height
+  significant_peaks <- peaks[dens$y[peaks] > (max(dens$y) * 0.02)]
+  
+  if(length(significant_peaks) >= 2) {
+    # The valley is the lowest point between the FIRST peak and the LAST peak
+    first_p <- significant_peaks[1]
+    last_p  <- significant_peaks[length(significant_peaks)]
+    
+    # Slice the density to only the area between peaks
+    between_y <- dens$y[first_p:last_p]
+    valley_idx <- which.min(between_y) + first_p - 1
+    threshold  <- dens$x[valley_idx]
+    if (!exists("threshold")) cat("Threshold not calculate. Revert to quantile-based threshold.\n")
+    if (exists("threshold")) cat("Threshold calculated.\n")
+    
+  } else {
+    # If bimodal logic fails (common at very low or very high beta), we use a quantile-based fallback. 
+    # For bimodal epidemic data, the 10th percentile is often a safe 'floor' for major outbreaks 
+    # NOTE: this is only suitable if the distribution is wide.
+    if(max(values) > 0.1) {
+      threshold <- 0.05 # A standard "5% prevalence" definition for epidemic establishment
+    } else {
+      threshold <- 1.0 # Everything is minor if the max is tiny
+    }
+  }
+  
+  return(threshold)
+}
+#-------------------------------------------------------------------------------------------------------------------------
+
+##########################################################################################################################
+
+
+### ALL MANUSCRIPT IMAGES
 
 # ------------------------------------------------------------------------------
 ## FIGURE 1 ----
@@ -53,7 +111,11 @@ files_directory <- "/scicore/home/chitnis/derkx0000/GraphComparison/Outfiles/"
 
 # Open ensemble of graphs for seed = 5000
 MASTER_ENSEMBLE_FOR_DM <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds")
+
+# All empirical graphs are identical. Choose any task. 
 empirical <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
+
+# Save total node number 
 nodes <- length(V(empirical$anchor))
 
 # Set models and colors
@@ -76,7 +138,6 @@ names(graph_list) <- c(models, "empirical")
 
 # Reorder
 graph_list <- graph_list[c("dcsbm","empirical", "random", "newclust_graph", "sbm", "spatial")]
-
 
 # Function to plot a single graph
 plot_graph <- function(list_item, title_text) {
@@ -126,7 +187,7 @@ titles <- c('DCSBM', 'Empirical', "ERM","NCRG", 'SBM', "SENCA")
 # Apply function to all plots
 styled_plots <- Map(plot_graph, graph_list, titles)
 
-# 3. Use cowplot::plot_grid (It's more robust than patchwork for weird objects)
+# 3. Use cowplot::plot_grid with horizontal and vertical alignment ('vh')
 all_graphs <- cowplot::plot_grid(plot_grid(
   plotlist = styled_plots, 
   ncol = 3, 
@@ -134,11 +195,16 @@ all_graphs <- cowplot::plot_grid(plot_grid(
   label_size = 20,
   label_fontface = "bold",
   label_fontfamily = "sans",
-  align = 'vh')) +              # Forces vertical and horizontal alignment
+  align = 'vh')) +      
   theme(plot.background = element_rect(fill = "white", colour = NA)) 
 all_graphs
 plotpath <- file.path(out_path, "Figure1_27_05_26.png")
 ggsave(plotpath, all_graphs, width = 18, height = 12) 
+
+# Remove files
+rm(MASTER_ENSEMBLE_FOR_DM)
+rm(empirical)
+rm(all_graphs)
 
 
 # ------------------------------------------------------------------------------
@@ -151,6 +217,8 @@ summary_check <- read_csv("Net_Sens/Seed_5000/summary_check.csv")
 # Leave out spatial optimization parameters, select only 1 replicate since identical
 summary_check_no_opt <- summary_check %>% filter(!grepl('Opt', Params), 
                                                  Replicate == 1)
+
+# Rename graph type variable levels
 summary_check_no_opt$Graph_type <- ifelse(summary_check_no_opt$Graph == 'dcsbm_graph', 
                                           'DCSBM',
                                           ifelse(summary_check_no_opt$Graph == 'empirical_graph', 
@@ -162,8 +230,11 @@ summary_check_no_opt$Graph_type <- ifelse(summary_check_no_opt$Graph == 'dcsbm_g
                                                                ifelse(summary_check_no_opt$Graph == 'newclust_graph', "NCRG",
                                                                       "SENCA")))))
 
+# Relevel the graph type variable
 summary_check_no_opt$Graph_type <- factor(summary_check_no_opt$Graph_type, 
                                           levels = c("DCSBM", 'Empirical', "ERM","NCRG", "SBM", "SENCA"))
+
+# Rename degree parameters for plotting
 summary_check_no_opt$Parameters <- ifelse(summary_check_no_opt$Params == 'Density', 
                                           'Density', 
                                           ifelse(summary_check_no_opt$Params == 'Avg_clust', 
@@ -180,6 +251,8 @@ summary_check_no_opt$Parameters <- ifelse(summary_check_no_opt$Params == 'Densit
                                                         )
                                                  )
                                           )
+
+# Relevel Parameters variable for plotting 
 summary_check_no_opt$Parameters <- factor(summary_check_no_opt$Parameters, 
                                           levels = c('Density', 
                                                      'Global Clustering', 
@@ -189,7 +262,7 @@ summary_check_no_opt$Parameters <- factor(summary_check_no_opt$Parameters,
                                                      "Maximum Degree")
                                           )
 
-# Summary statistics
+# Summarize by mean, max, median, min
 parameter_summary <- summary_check_no_opt %>% 
   group_by(Graph_type, Params) %>% 
   summarise(mean = mean(Values),
@@ -255,6 +328,48 @@ summary_plot
 plotpath <- file.path(out_path, "Figure2_27_05_26.png")
 ggsave(plotpath, summary_plot, width = 18, height = 16)  
 
+# Remove large files
+rm(summary_check)
+rm(summary_check_no_opt)
+rm(summary_plot)
+# ------------------------------------------------------------------------------
+## TABLE 2 ----
+# ------------------------------------------------------------------------------
+
+# Open data
+all_seeds_degree_distributions_5000 <- read_csv("Net_Sens/Graphs/Seed_5000/all_seeds_degree_distributions.csv") %>%
+  mutate(Seed_run = '5000_seeds')
+
+# Summarize 
+degree_summary <- all_seeds_degree_distributions_5000 %>%
+  uncount(weights = frequency) %>%
+  group_by(type, task_id) %>%
+  summarise(
+    min_degree = min(degree),
+    q25 = quantile(degree, 0.25),
+    median = median(degree),
+    mean = mean(degree),
+    q75 = quantile(degree, 0.75),
+    max_degree = max(degree),
+    .groups = "drop"
+  ) %>%
+  group_by(type) %>%
+  summarise(
+    min = mean(min_degree),
+    q25 = mean(q25),
+    median = mean(median),
+    mean = mean(mean),
+    q75 = mean(q75),
+    max = mean(max_degree),
+    .groups = "drop"
+  ) %>%
+  mutate(across(where(is.numeric), ~ sprintf("%.3f", .x)))
+
+# These results are summarized in table 2 of the manuscript
+degree_summary
+
+# Remove large files
+rm(all_seeds_degree_distributions_5000)
 
 
 # ------------------------------------------------------------------------------
@@ -371,48 +486,21 @@ final_plot
 plotpath <- file.path(out_path, "Figure3_27_05_26.png")
 ggsave(plotpath, final_plot, width = 16, height = 10)
 
+# Remove large files
+rm(all_seeds_degree_distributions_5000)
+rm(final_plot)
+rm(degree_plot)
 
-# ------------------------------------------------------------------------------
-## TABLE 3 ----
-# ------------------------------------------------------------------------------
-
-# Open data
-all_seeds_degree_distributions_5000 <- read_csv("Net_Sens/Graphs/Seed_5000/all_seeds_degree_distributions.csv") %>%
-  mutate(Seed_run = '5000_seeds')
-
-# Summarize 
-degree_summary <- all_seeds_degree_distributions_5000 %>%
-  uncount(weights = frequency) %>%
-  group_by(type, task_id) %>%
-  summarise(
-    min_degree = min(degree),
-    q25 = quantile(degree, 0.25),
-    median = median(degree),
-    mean = mean(degree),
-    q75 = quantile(degree, 0.75),
-    max_degree = max(degree),
-    .groups = "drop"
-  ) %>%
-  group_by(type) %>%
-  summarise(
-    min = mean(min_degree),
-    q25 = mean(q25),
-    median = mean(median),
-    mean = mean(mean),
-    q75 = mean(q75),
-    max = mean(max_degree),
-    .groups = "drop"
-  ) %>%
-  mutate(across(where(is.numeric), ~ sprintf("%.3f", .x)))
-degree_summary 
 
 # ------------------------------------------------------------------------------
 ## FIGURE 4 ----
 # ------------------------------------------------------------------------------
 
-# Import
+# Import all files: SIS and SEIR output
 Summary_SIS_ran <- read_csv("Outfiles/Randomized_Summary_SIS_6000000_mseed_100_01June26.csv")
 Summary_SEIR_ran <- read_csv("Outfiles/Randomized_Summary_SEIR_3000000_mseed_100_01June26.csv")
+
+# Import empirical graph and calculate node total
 empirical <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
 nodes <- length(V(empirical$anchor))
 
@@ -580,16 +668,22 @@ cases_plot <- ggplot(model_cases, aes(x = beta,
 cases_plot
 plotpath <- file.path(out_path, "Figure4_27_05_26.png")
 ggsave(plotpath, cases_plot, width = 12, height = 16)   
+
+# Remove large files
+rm(Summary_SIS_ran)
+rm(Summary_SEIR_ran)
+rm(SIS_cases)
+rm(SEIR_cases)
+rm(model_cases)
+rm(cases_plot)
   
   
 # ------------------------------------------------------------------------------
 ## FIGURE 5 ----
 # ------------------------------------------------------------------------------
 
-
-# Import SEIR data
+# Import SEIR data and mutate names
 size_and_duration <- read_csv("Outfiles/Randomized_Summary_SEIR_3000000_mseed_100_01June26.csv") %>%
-  #filter(total_infections > 0) %>%
   select(graph_type, graph_idx, beta, delta, sigma, seed, peak_deaths, duration_days, total_infections) %>%
   mutate(Graph = ifelse(graph_type == 'dcsbm', 'DCSBM',
                         ifelse(graph_type == 'empirical', 'Empirical',
@@ -597,61 +691,21 @@ size_and_duration <- read_csv("Outfiles/Randomized_Summary_SEIR_3000000_mseed_10
                                       ifelse(graph_type == 'sbm', 'SBM', 
                                              ifelse(graph_type == 'newclust_graph', 'NCRG', 'SENCA'))))),
          final_size = peak_deaths/235) %>%
+  
+  # Retain only three transmission rate values for efficient plotting
   filter(beta == 0.01 | beta == 0.1 | beta == 0.2) %>%
   rename_with(~c("duration"), c(duration_days))
+
+# Relevel graph factor
 size_and_duration$Graph <- factor(size_and_duration$Graph, 
                                   levels = c("DCSBM", "Empirical", "ERM", 'NCRG', 'SBM', "SENCA"))
 
-# Function to find local maxima in outbreak data
-find_outbreak_threshold_sensitive <- function(values, adjust_bw) {
-  
-  # 1. Basic cleaning
-  values <- na.omit(values)
-  if(length(unique(values)) < 5) return(0.05)
-  
-  # 2. Force high sensitivity using a small 'adjust' value.
-  # adjust = 0.3 makes the density function much more sensitive to dips (the valley).
-  # We use 'from' and 'to' to ensure we capture the 0-1 range of population fraction.
-  dens <- density(values, adjust = adjust_bw, from = 0, to = 1)
-  
-  # 3. Find peaks (local maxima)
-  # A point is a peak if it's higher than its two neighbors
-  is_peak <- diff(sign(diff(dens$y))) == -2
-  peaks <- which(is_peak) + 1
-  
-  # 4. Filter peaks: Ignore tiny "wiggles" by requiring peaks to be a certain 
-  # percentage of the maximum density height
-  significant_peaks <- peaks[dens$y[peaks] > (max(dens$y) * 0.02)]
-  
-  if(length(significant_peaks) >= 2) {
-    # Logic: The valley is the lowest point between the FIRST peak and the LAST peak
-    first_p <- significant_peaks[1]
-    last_p  <- significant_peaks[length(significant_peaks)]
-    
-    # Slice the density to just the area between peaks
-    between_y <- dens$y[first_p:last_p]
-    valley_idx <- which.min(between_y) + first_p - 1
-    threshold  <- dens$x[valley_idx]
-    if (!exists("threshold")) cat("Threshold not calculate. Revert to quantile-based threshold.\n")
-    if (exists("threshold")) cat("Threshold calculated.\n")
-    
-  } else {
-    # FALLBACK: If bimodal logic fails (common at very low or very high beta)
-    # We use a quantile-based fallback. For bimodal epidemic data, 
-    # the 10th percentile is often a safe 'floor' for major outbreaks 
-    # IF the distribution is wide.
-    if(max(values) > 0.1) {
-      threshold <- 0.05 # A standard "5% prevalence" definition for epidemic establishment
-    } else {
-      threshold <- 1.0 # Everything is minor if the max is tiny
-    }
-  }
-  
-  return(threshold)
-}
-
-# Apply to your data table by group
+# Set df as data table
 setDT(size_and_duration)
+
+# Use helper function 'find_outbreak_threshold_sensitive' to identify outbreak thresholds
+# We use 0.3 for bandwidth adjustment. See 'optimal_bandwidth.R' and methods of corresponding
+# manuscript for explanation of this. 
 size_and_duration[, dynamic_threshold := find_outbreak_threshold_sensitive(values = final_size,
                                                                            adjust_bw = 0.3), 
                   by = .(Graph, beta)]
@@ -662,20 +716,9 @@ size_and_duration[, outbreak_type := ifelse(final_size <= dynamic_threshold,
                                             "Major")]
 table(size_and_duration$outbreak_type)
 
-# Examine levels
-check <- size_and_duration %>% group_by(Graph, beta, outbreak_type) %>% 
-  summarize(mean = mean(final_size), 
-            median = median(final_size),
-            sd = sd(final_size), 
-            max = max(final_size),
-            mean_time = mean(duration),
-            median_time = median(duration),
-            sd_time = sd(duration)) %>% 
-  filter(beta == 0.01)
-
-
 # Custom colour palette
 graph_levels <- c("DCSBM", "Empirical", "ERM",'NCRG', 'SBM', "SENCA")
+
 custom_pal <- c(
   # (GraphType) . (outbreak_type)
   "ERM.Minor"         = "#FAA76B", "ERM.Major"         = "#CB8350",
@@ -720,6 +763,10 @@ plotpath <- file.path(out_path, "Figure5_27_05_26.png")
 ggsave(plotpath, comparison_plot, width = 18, height = 12)  
 write.csv(size_and_duration, "/Outfiles/size_and_duration_SEIR_3000000.csv", row.names = FALSE)
 
+# Remove large files
+rm(size_and_duration)
+rm(comparison_plot)
+
 
 # -------------------------------------------------------
 ## FIGURE 6 ----
@@ -743,55 +790,8 @@ Romana_SEIR <- read_csv("Outfiles/Romana_Summary_SEIR_3000000_mseed_100_04June26
 otherlocations_SEIR <- rbind(Hepang_SEIR, Habi_SEIR, Sabaneta_SEIR, Romana_SEIR)
 setDT(otherlocations_SEIR)
 
-# Function to find local maxima in outbreak data
-find_outbreak_threshold_sensitive <- function(values, adjust_bw) {
-  
-  # 1. Basic cleaning
-  values <- na.omit(values)
-  if(length(unique(values)) < 5) return(0.05)
-  
-  # 2. Force high sensitivity using a small 'adjust' value.
-  # adjust = 0.3 makes the density function much more sensitive to dips (the valley).
-  # We use 'from' and 'to' to ensure we capture the 0-1 range of population fraction.
-  dens <- density(values, adjust = adjust_bw, from = 0, to = 1)
-  
-  # 3. Find peaks (local maxima)
-  # A point is a peak if it's higher than its two neighbors
-  is_peak <- diff(sign(diff(dens$y))) == -2
-  peaks <- which(is_peak) + 1
-  
-  # 4. Filter peaks: Ignore tiny "wiggles" by requiring peaks to be a certain 
-  # percentage of the maximum density height
-  significant_peaks <- peaks[dens$y[peaks] > (max(dens$y) * 0.02)]
-  
-  if(length(significant_peaks) >= 2) {
-    # Logic: The valley is the lowest point between the FIRST peak and the LAST peak
-    first_p <- significant_peaks[1]
-    last_p  <- significant_peaks[length(significant_peaks)]
-    
-    # Slice the density to just the area between peaks
-    between_y <- dens$y[first_p:last_p]
-    valley_idx <- which.min(between_y) + first_p - 1
-    threshold  <- dens$x[valley_idx]
-    if (!exists("threshold")) cat("Threshold not calculate. Revert to quantile-based threshold.\n")
-    if (exists("threshold")) cat("Threshold calculated.\n")
-    
-  } else {
-    # FALLBACK: If bimodal logic fails (common at very low or very high beta)
-    # We use a quantile-based fallback. For bimodal epidemic data, 
-    # the 10th percentile is often a safe 'floor' for major outbreaks 
-    # IF the distribution is wide.
-    if(max(values) > 0.1) {
-      threshold <- 0.05 # A standard "5% prevalence" definition for epidemic establishment
-    } else {
-      threshold <- 1.0 # Everything is minor if the max is tiny
-    }
-  }
-  
-  return(threshold)
-}
-
-# Apply to your data table by group
+# Apply outbreak threshold identification to data table by group
+# Requires helper function 1
 otherlocations_SEIR[, dynamic_threshold := find_outbreak_threshold_sensitive(
   values = final_size, 
   adjust_bw = 0.3
@@ -827,6 +827,8 @@ SEIR_cases$Graph <- ifelse(SEIR_cases$graph_type == 'dcsbm', 'DCSBM',
                                   ifelse(SEIR_cases$graph_type == 'empirical', 'Empirical',
                                          ifelse(SEIR_cases$graph_type == 'spatial', 'SENCA', 
                                                 ifelse(SEIR_cases$graph_type == 'ncrg', "NCRG", "ERM")))))
+
+# Relevel factor
 SEIR_cases$Graph <- factor(SEIR_cases$Graph, 
                             levels = c("ERM",
                                        'SBM',
@@ -905,141 +907,14 @@ otherlocations_prevalence
 plotpath <- file.path(out_path, "Figure6_27_05_26.png")
 ggsave(plotpath, otherlocations_prevalence, width = 12, height = 12)   
 
-
-
-# ------------------------------------------------------------------------------
-## SENSITIVITY ANALYSES OUTBREAK CLASSIFICATION ----
-# ------------------------------------------------------------------------------
-
-library(data.table)
-
-# Values of h to test
-h_values <- seq(0.1, 0.5, by = 0.05)
-
-# Store classifications for each h
-for (h in h_values) {
-  
-  # Create a safe column name, e.g. outbreak_type_h01, outbreak_type_h015
-  h_name <- gsub("\\.", "", format(h, trim = TRUE))
-  
-  threshold_col <- paste0("threshold_h", h_name)
-  type_col      <- paste0("outbreak_type_h", h_name)
-  
-  # Calculate threshold separately for each Graph x beta group
-  size_and_duration[, (threshold_col) := 
-                      find_outbreak_threshold_sensitive(
-                        values = final_size,
-                        adjust_bw = h
-                      ),
-                    by = .(Graph, beta)]
-  
-  # Classify outbreaks using the group-specific threshold
-  size_and_duration[, (type_col) := 
-                      fifelse(final_size <= get(threshold_col),
-                              "Minor",
-                              "Major")]
-}
-
-
-#### CLASSIFICATION OF h
-robustness_summary <- rbindlist(
-  lapply(h_values, function(h) {
-    
-    h_name <- gsub("\\.", "", format(h, trim = TRUE))
-    type_col <- paste0("outbreak_type_h", h_name)
-    
-    counts <- table(size_and_duration[[type_col]])
-    
-    data.table(
-      h = h,
-      Minor = ifelse("Minor" %in% names(counts), counts["Minor"], 0),
-      Major = ifelse("Major" %in% names(counts), counts["Major"], 0)
-    )
-  })
-)
-
-robustness_summary[, `:=`(
-  Total = Minor + Major,
-  Proportion_Major = Major / (Minor + Major)
-)]
-
-robustness_summary
-robustness_by_group[Proportion_robust < 1]
-
-
-
-
-### Check every h to original classification
-
-# Compare each h against the original classification
-robustness_comparison <- rbindlist(
-  lapply(h_values, function(h) {
-    
-    h_name <- gsub("\\.", "", format(h, trim = TRUE))
-    type_col <- paste0("outbreak_type_h", h_name)
-    
-    agreement <- size_and_duration[[type_col]] == size_and_duration$outbreak_type
-    
-    data.table(
-      h = h,
-      Agreement = mean(agreement),
-      Disagreement = mean(!agreement),
-      N_disagreements = sum(!agreement)
-    )
-  })
-)
-
-robustness_comparison
-
-
-### GRAPH ROBUSTNESS
-
-group_robustness <- rbindlist(
-  lapply(h_values, function(h) {
-    
-    h_name <- gsub("\\.", "", format(h, trim = TRUE))
-    type_col <- paste0("outbreak_type_h", h_name)
-    
-    size_and_duration[, .(
-      h = h,
-      Agreement = mean(get(type_col) == outbreak_type),
-      N_disagreements = sum(get(type_col) != outbreak_type)
-    ), by = .(Graph, beta)]
-  })
-)
-
-group_robustness
-
-# Perfectly robust:
-group_robustness[Agreement < 1]
-
-
-### STABLE CLASSIFICATION?
-type_cols <- grep("^outbreak_type_h", names(size_and_duration), value = TRUE)
-type_cols
-
-size_and_duration[, classification_robust := 
-                    apply(.SD, 1, function(x) {
-                      length(unique(x)) == 1
-                    }),
-                  .SDcols = type_cols]
-
-table(size_and_duration$classification_robust)
-mean(size_and_duration$classification_robust)
-
-# Change classification?
-robustness_by_group <- size_and_duration[
-  ,
-  .(
-    N = .N,
-    N_nonrobust = sum(!classification_robust),
-    Proportion_robust = mean(classification_robust)
-  ),
-  by = .(Graph, beta)
-][order(Proportion_robust)]
-
-robustness_by_group
-robustness_by_group[Proportion_robust < 1]
+# Remove large files
+rm(SEIR_cases)
+rm(otherlocations_SEIR)
+rm(Romana_SEIR)
+rm(Sabaneta_SEIR)
+rm(Habi_SEIR)
+rm(Hepang_SEIR)
+rm(otherlocations_prevalence)
 
 
 # ------------------------------------------------------------------------------

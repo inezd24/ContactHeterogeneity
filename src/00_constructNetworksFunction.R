@@ -1,7 +1,7 @@
 ###########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
-# Created: December 2025; Last edited: September 2025
+# Created: December 2025; Last edited: September 2026
 # This script acts as a repository for helper function used throughout analyses. In their current form, the remaining 
 # scripts do not use 'source()' to call these functions, but call them locally. You may adapt this as desired. Please note
 # that the functions are well described here, but not elsewhere.
@@ -29,13 +29,14 @@ library(lhs)
 
 ### Helper functions
 
+#-------------------------------------------------------------------------------------------------------------------------
 # 1. Make empirical network: this function takes an edgelist and turns it into a basic igraph graph object. 
 empirical_net <- function(df){
   
   # Function generates a simple network from a dataframe with variables 'dog' and 'peer' as edgelist components
   # It does not care whether interactions are weighted, repeated, or else, as it will turn the edgelist into 
   # an undirected, unweighted graph. 
-  # @param: 'df': dataframe that can be used as edgelist and has the columns 'dog' and 'peer'. 
+  #' @param: 'df': dataframe that can be used as edgelist and has the columns 'dog' and 'peer'. 
   # Necessary packages: igraph
   
   cat("\nStarting with construction of empirical graph.\n")
@@ -71,12 +72,14 @@ empirical_net <- function(df){
            edge_density_g = edge_density_g,
            nodes_g = nodes_g))
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
+#-------------------------------------------------------------------------------------------------------------------------
 # 2. Helper function to compute the Degree Distribution
 calculate_degree_distribution <- function(graph) {
   
   # Function returns a dataframe with empirical degree PMF
-  # @param: 'graph': any igraph grpah object. If you use a different graph 
+  #' @param: 'graph': any igraph grpah object. If you use a different graph 
   # type, make sure to convert it to an igraph object. 
   # Necessary packages: igraph
 
@@ -92,14 +95,16 @@ calculate_degree_distribution <- function(graph) {
   # Return a dataframe mapping degree value to probability
   return(as.data.frame(dist_pmf))
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
+#-------------------------------------------------------------------------------------------------------------------------
 # 3. Distance statistic 1: Kolmogorov-Smirnov (KS) Distance
 ks_distance <- function(synthetic_degrees, empirical_degrees) {
 
   # Function calculates the Kolmogorov-Smirnov distance between two 
   # degree distributions
-  # @param: 'synthetic_degrees': degree distribution of other graph
-  # @param: 'empirical_degrees': degree distribution of reference graph
+  #' @param: 'synthetic_degrees': degree distribution of other graph
+  #' @param: 'empirical_degrees': degree distribution of reference graph
   # Necessary packages: igraph, stats (for ecdf)
   
   # Convert degrees to ECDFs (Empirical Cumulative Distribution Function)
@@ -115,14 +120,16 @@ ks_distance <- function(synthetic_degrees, empirical_degrees) {
   # Return KS distance
   return(ks_dist)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
+#-------------------------------------------------------------------------------------------------------------------------
 # 4. Distance statistic 2: Chi-Squared (χ²) Distance
 chi2_distance <- function(synth_df, emp_df) {
 
   # Function calculates the Chi-Squared (χ²) distance between two 
   # degree distributions. Requires output from helper function 2. 
-  # @param: 'synth_df': df of degrees and probability of other graph
-  # @param: 'emp_df': df of degrees and probability of reference graph
+  #' @param: 'synth_df': df of degrees and probability of other graph
+  #' @param: 'emp_df': df of degrees and probability of reference graph
   # Necessary packages: /
   
   # Standardize column names
@@ -144,20 +151,27 @@ chi2_distance <- function(synth_df, emp_df) {
   
   return(chi2)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# 5. Network construction
+#-------------------------------------------------------------------------------------------------------------------------
+# 5. Spatially Explicit Network Construction Algorithm (SENCA)
 construct_network <- function(parameters, N_nodes_large, 
                               x_coordinates, 
                               y_coordinates, 
                               seed = NULL) {
   
+  # This function is a spatially-explicit network construction algorithm to generate the SENCA network
+  # It is adapted from code by Laager et al. (2018), who used it to create degree-optimized networks
   #' @param parameters A numeric vector c(m, p, s), where m is the Poisson mean for 
   #'   preferential attachment, p is the proportion of local dogs, and s is the spatial decay parameter.
+  #'   See Laager et al. (2018) for detailed descriptions of these parameters .
   #' @param N_nodes_large The total number of nodes in the network.
   #' @param x_coordinates A numeric vector of x-coordinates for all nodes.
   #' @param y_coordinates A numeric vector of y-coordinates for all nodes.
   #' @param seed a numeric vector of seed to set
-  #' @return An igraph object (a simulated network).
+  #' @return An igraph object (a simulated network, 'H').
+
+  ## Step 1: initialization
   
   # Parameter Initialization
   l <- parameters[1] # Mean number of peers for preferential attachment
@@ -177,10 +191,7 @@ construct_network <- function(parameters, N_nodes_large,
     set.seed(seed)
   }
   
-  ### Spatial edge creation
-  
-  # We use the raw seed for this phase
-  if (!is.null(seed)) set.seed(seed)
+  ## Step 2: spatial edge creation
   
   # Loop only for k < j to avoid processing the same dyad twice and ensure only one check per pair.
   for (i in 1:(N_nodes_large - 1)) { # prevents self-loops
@@ -190,7 +201,7 @@ construct_network <- function(parameters, N_nodes_large,
       d_ij <- sqrt((x_coordinates[i] - x_coordinates[j])^2 +
                      (y_coordinates[i] - y_coordinates[j])^2)
       
-      # Calculate the probability of attachment (r) based on distance (p_ij)
+      # Calculate the probability of attachment (p_ij) based on distance (d_ij) and spatial decay (k)
       p_ij <- exp(-k * d_ij)
       
       # Create edge if probability is higher than random
@@ -201,12 +212,11 @@ construct_network <- function(parameters, N_nodes_large,
     }
   }
   
+  ## Step 3: preferential attachment
   
-  ### Preferential attachment
-  
-  # We use seed + 10^6 to ensure this stream never overlaps with Phase 1
+  # As we will use R's P-RNG again, we use seed + 10^6 to ensure 
+  # this stream never overlaps with step 2
   if (!is.null(seed)) set.seed(seed + 1000000)
-  
   
   # Calculate degrees
   degrees <- colSums(adjacency)
@@ -215,7 +225,7 @@ construct_network <- function(parameters, N_nodes_large,
   indices_repeated <- unlist(lapply(1:length(degrees),
                                     function(j) rep(j, degrees[j])))
   
-  # Check that we'd have more than 0 pref_nodes
+  # Check: we should have more than 0 pref_nodes
   if(N_nodes_large > number_of_local_dogs){
     
     # Loop over preferred nodes
@@ -225,10 +235,10 @@ construct_network <- function(parameters, N_nodes_large,
       # Generate the desired number of peers
       desired_peers <- rpois(1, l)
       
-      # Check the size of the available pool (total existing links)
+      # Check: size of the available pool (total existing links)
       pool_size <- length(indices_repeated)
       
-      # *** STRICT CHECK IMPLEMENTATION ***
+      # Check: desired sample size should not exceed total population
       if (desired_peers > pool_size) {
         
         # If the desired sample size exceeds the available population, stop the execution.
@@ -238,12 +248,14 @@ construct_network <- function(parameters, N_nodes_large,
           pool_size, " unique peer links are currently available in the network. ",
           "Please reduce the value of 'L'."))
       }
-      # *** End of strict check *** 
       
+      # Set number of peers as desired nr of peers
       number_of_peers <- desired_peers
+
+      # Check that both are not empty
       if (number_of_peers > 0 && length(indices_repeated) > 0) {
         
-        # Sampling without replacement as according to Mirjam's python script
+        # Sampling without replacement as according to the original python code
         # Deterministic for the chosen seed
         indices_peers <- sample(indices_repeated, number_of_peers, replace = FALSE)
         
@@ -258,104 +270,49 @@ construct_network <- function(parameters, N_nodes_large,
     
   }
   
-  ### Clean up and output
+  ## Step 4: Clean up and output
   
-  # Remove self edges (if any)
+  # Remove self edges (if any; same as simplification)
   diag(adjacency) <- 0
   
-  # Convert the adjacency matrix to an igraph object (H)
+  # Convert the adjacency matrix to an undirected igraph object (H)
   H <- graph_from_adjacency_matrix(adjacency, mode = "undirected")
   
   # Add spatial coordinates as vertex attributes
   V(H)$x_coord <- x_coordinates
   V(H)$y_coord <- y_coordinates
   
+  # Return graph
   return(H)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# 6. Generate empty SBM graph
-generate_sbm_graph <- function(num_nodes, # number of nodes
-                               c,         # block membership
-                               B,         # block probability matrix
-                               seed = NULL){       
-  
-  # Force a seed
-  if (!is.null(seed)) set.seed(seed)
-  
-  # Make an empty graph with the identical number of nodes and add the blocks
-  g_sim <- make_empty_graph(n = num_nodes, directed = FALSE)
-  V(g_sim)$community <- factor(c)
-  
-  # Create full B matrix
-  full_B_matrix <- B[c, c]
-  
-  # Iterate through all unique pairs of nodes (i, j) where i < j
-  for (i in 1:(num_nodes - 1)) {
-    for (j in (i + 1):num_nodes) {
-      
-      # Get the community IDs of the two nodes
-      
-      # Get the probability of connection from the matrix
-      prob <- full_B_matrix[i,j]
-      
-      # Draw a random number; if it's less than the probability, add an edge
-      # runif(1) is deterministic based on 'seed'
-      if (runif(1) < prob) { # use independent Bernoulli trials
-        
-        # If success: add the edges to the new graph
-        g_sim <- add_edges(g_sim, c(i, j))
-      }
-    }
-  }
-  return(g_sim)
-}
-
-# 7. Helper function: Generate graph for DCSBM 
-generate_dcsbm_graph <- function(num_nodes, # number of nodes
-                                 Phat, # edge probability matrix
-                                 seed = NULL){
-  
-  # Force a seed
-  if (!is.null(seed)) set.seed(seed)
-  
-  # Make an empty graph with the identical number of nodes and add the blocks
-  g_sim <- igraph::make_empty_graph(n = num_nodes, directed = FALSE)
-  
-  # Iterate through all unique pairs of nodes (i, j) where i < j
-  for (i in 1:(num_nodes - 1)) {
-    for (j in (i + 1):num_nodes) {
-      
-      print(paste0("Testing node", i, " and node ", j))
-      
-      # Get the probability of connection
-      # This is the key change: we multiply the block parameter B by the
-      # degree propensities of the two nodes.
-      prob <- Phat[i,j]
-      
-      # Draw a random number; if it's less than the probability, add an edge
-      # runif(1) is deterministic based on 'seed'     
-      if (runif(1) < prob) { # use independent Bernoulli trials
-        
-        # If success: add the edges to the new graph
-        g_sim <- add_edges(g_sim, c(i, j))
-      }
-    }
-  }
-  return(g_sim)
-}
-
-# 8. Function to optimize grid
+#-------------------------------------------------------------------------------------------------------------------------
+# 6. Function to optimize parameter grid (this function calls function 5)
 grid_optimization <- function(empirical_net,
                               kappa_grid,
                               tau_grid,
                               lambda_grid,
                               square_size = 1,
                               base_seed = 42){
+
+  # This function performs grid optimization for the kappa, tau, and lambda parameters,
+  # given a certain parameter range for each parameter and a certain square size. 
+  # This function is also fully adapted from Laager et al. (2018)'s python code. 
+  #' @param: 'empirical_net': the empirical network as an igraph object
+  #' @param: 'kappa_grid': parameter range for kappa
+  #' @param: 'tau_grid': parameter range for tau
+  #' @param: 'lambda_grid': parameter range for lambda
+  #' @param: 'square_size': size of each square for grid
+  #' @param: 'base_seed': seed (this is set)
+  #' @return: full results table from which optimized parameter values can be obtained
   
-  ### Define input parameters for construction
+  ## Step 1: Define input parameters for construction
   
-  # Define degree vectors and frequency table
+  # Degree
   empirical_degrees_vector <- degree(empirical_net)
+
+  # Degree probability (helper function 2 output)
   empirical_dist_df <- calculate_degree_distribution(empirical_net)
   
   # Set nr. of empirical nodes
@@ -364,30 +321,24 @@ grid_optimization <- function(empirical_net,
   # Set total runs: e.g. 3 * 10 * 10 = 300
   total_runs <- length(kappa_grid) * length(tau_grid) * length(lambda_grid)
   
-  # Initialize results table
-  results_grid <- data.frame(
-    kappa = numeric(total_runs),
-    tau = numeric(total_runs),
-    lambda = numeric(total_runs),
-    ks_dist = numeric(total_runs),
-    chi2_dist = numeric(total_runs), 
-    av_degree = numeric(total_runs),
-    max_degree = numeric(total_runs),
-    edges = numeric(total_runs),
-    edge_density = numeric(total_runs))
-  run_counter <- 1
-  
   # Set seed to ensure coordinates are fixed
   set.seed(base_seed)
   
   # Set square edge sizes and x_coordinates
   square_edge_size <- square_size
   N_nodes <- square_edge_size^2 * empirical_nodes
-  x_coor <- square_edge_size * runif(N_nodes)
-  y_coor <- square_edge_size * runif(N_nodes)
+  x_coor <- square_edge_size * runif(N_nodes) # gives point between 0 and 1
+  y_coor <- square_edge_size * runif(N_nodes) # gives point between 0 and 1
   
+  # Initialize results table
+  results_grid <- data.frame(matrix(ncol = 10, nrow = total_runs))
+  colnames(results_grid) <- c("kappa","tau","lambda","ks_dist","chi2_dist",
+                              "av_degree","med_degree", "max_degree","edges","edge_density")
   
-  ### Find optimized kappa, tau, lambda
+  # Set run counter
+  run_counter <- 1
+  
+  ## Step 2: Find optimized kappa, tau, lambda
   
   # Initiate grid search
   print(paste("Starting Grid Search with", total_runs, "runs..."))
@@ -407,6 +358,7 @@ grid_optimization <- function(empirical_net,
                                              y_coordinates = y_coor, 
                                              seed = run_seed)
         
+        # Count edges and get edge density
         edges <- ecount(synthetic_graph)
         density <- edge_density(synthetic_graph)
         
@@ -434,15 +386,15 @@ grid_optimization <- function(empirical_net,
         # Change for seed
         run_counter <- run_counter + 1
         
-        # Print results
-        print(paste("Run", run_counter - 1, ": κ=", kappa_val, ", τ=", tau_val, ", λ=", lambda_val, 
-                    "| KS Dist:", round(current_ks_dist, 4)))
+        # Uncomment below if you want to print the results (will significantly slow the process)
+        #print(paste("Run", run_counter - 1, ": κ=", kappa_val, ", τ=", tau_val, ", λ=", lambda_val, 
+        #            "| KS Dist:", round(current_ks_dist, 4)))
       }
     }
   }
   print("Grid Search complete.")
   
-  ### Identify Optimal Parameters of p, s, m
+  ## Step 3: Identify Optimal Parameters of p, s, m
   
   # Find the row corresponding to the minimum KS distance
   min_ks_row <- results_grid[which.min(results_grid$ks_dist), ]
@@ -450,7 +402,8 @@ grid_optimization <- function(empirical_net,
   # Find the row corresponding to the minimum Chi-squared distance
   min_chi2_row <- results_grid[which.min(results_grid$chi2_dist), ]
   
-  # Combine and display the best results
+  # Combine and display the best results > choose the parameters based on these results
+  # High preference given to the KS distance over the X2 distance in manuscript
   optimal_params <- list(
     KS_Min_Result = min_ks_row,
     Chi2_Min_Result = min_chi2_row)
@@ -461,12 +414,100 @@ grid_optimization <- function(empirical_net,
   print("Parameters that MINIMIZE Chi-Squared Distance (χ²):")
   print(min_chi2_row)
   
+  # Return results table
   return(results_grid)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# 9. ReCoN graph generator by Staudt et al. (2017)
+#-------------------------------------------------------------------------------------------------------------------------
+# 7. Generate graph with SBM
+generate_sbm_graph <- function(num_nodes, 
+                               c,     
+                               B,        
+                               seed = NULL){     
 
-### Final function to construct all five networks
+  # Function generates a network using a stochastic block model
+  # This function already requires you to know c and B for a given empirical network
+  #' @param: 'num_nodes': number of nodes (of your empirical graph)
+  #' @param: 'c': block membership
+  #' @param: 'B': block probability matrix 
+  #' @param: 'seed': optional seed
+  #' @return: an igraph object ('g_sim')
+  
+  # Set optional seed (per function argument)
+  if (!is.null(seed)) set.seed(seed)
+  
+  # Make an empty graph with the identical number of nodes and add the blocks
+  g_sim <- igraph::make_empty_graph(n = num_nodes, directed = FALSE)
+  V(g_sim)$community <- factor(c)
+  
+  # Create full B matrix
+  full_B_matrix <- B[c, c]
+  
+  # Iterate through all unique pairs of nodes (i, j) where i < j
+  for (i in 1:(num_nodes - 1)) {
+    for (j in (i + 1):num_nodes) {
+            
+      # Get the probability of connection from the matrix
+      prob <- full_B_matrix[i,j]
+      
+      # Draw a random number; if it's less than the probability, add an edge
+      # runif(1) is deterministic based on 'seed'
+      if (runif(1) < prob) { 
+        
+        # If success: add the edges to the new graph
+        g_sim <- add_edges(g_sim, c(i, j))
+      }
+    }
+  }
+  return(g_sim)
+}
+#-------------------------------------------------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------------------------------------------------
+# 8. Generate graph with DCSBM
+generate_dcsbm_graph <- function(num_nodes, 
+                                 Phat, 
+                                 seed = NULL){
+
+  # Function generates a network using a degree-corrected stochastic block model
+  # This function already requires you to know Phat for a given empirical network
+  #' @param: 'num_nodes': number of nodes (of your empirical graph)
+  #' @param: 'Phat': edge probability matrix
+  #' @param: 'seed': optional seed
+  #' @return: an igraph object ('g_sim')
+  
+  # Force a seed
+  if (!is.null(seed)) set.seed(seed)
+  
+  # Make an empty graph with the identical number of nodes and add the blocks
+  g_sim <- igraph::make_empty_graph(n = num_nodes, directed = FALSE)
+  
+  # Iterate through all unique pairs of nodes (i, j) where i < j
+  for (i in 1:(num_nodes - 1)) {
+    for (j in (i + 1):num_nodes) {
+      
+      # Uncomment this if you want to print every node combination
+      # print(paste0("Testing node", i, " and node ", j)) 
+      
+      # Get the probability of connection
+      prob <- Phat[i,j]
+      
+      # Draw a random number; if it's less than the probability, add an edge
+      # runif(1) is deterministic based on 'seed'     
+      if (runif(1) < prob) { 
+        
+        # If success: add the edges to the new graph
+        g_sim <- add_edges(g_sim, c(i, j))
+      }
+    }
+  }
+  return(g_sim)
+}
+#-------------------------------------------------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------------------------------------------------
+# 9. Pipeline to construct all networks
 construct_five_networks <- function(empirical_edgelist, 
                                     square_edge_size = 1,
                                     kappa_grid, 
@@ -474,20 +515,36 @@ construct_five_networks <- function(empirical_edgelist,
                                     lambda_grid,
                                     K_max = 20,
                                     base_seed){
+
+  # This function relies on all previous helper functions to fulfill network construction
+  #' @param: 'empirical_edgelist': an edgelist as detailed in helper function 1
+  #' @param: 'square_edge_size': edge size for grid. Default = 1
+  #' @param: 'kappa_grid': parameter range for kappa
+  #' @param: 'tau_grid': parameter range for tau
+  #' @param: 'lambda_grid': parameter range for lambda
+  #' @param: 'K_max': maximum K for BIC
+  #' @param: 'base_seed': seed for reproducibility
+  #' @return: list of lists with graphs, optimal SENCA parameters and SBM/DCSBM communities
   
-  set.seed(base_seed)
+
+  ## Step 1: Create empirical network from edgelist
   
-  ### Empirical network
-  
-  # Create empirical network and degree distribution
+  # Create empirical network with helper function 1
   empirical_network <- empirical_net(empirical_edgelist)
+
+  # Save the graph
   empirical_graph <- empirical_network$graph
+
+  # Calculate number of nodes and edges
   empirical_nodes <- length(degree(empirical_graph))
   empirical_edges <- ecount(empirical_graph)
   
-  ### Generator 1: Mirjam's network generator
+
+  ## Step 2: network generation using SENCA
+
+    cat("\nStarting SENCA graph construction.\n")
   
-  # Set square edge sizes and x_coordinates
+  # Set square edge sizes and x_coordinates for network construction
   N_nodes <- square_edge_size^2 * empirical_nodes
   
   set.seed(base_seed + 10) # Specific block for X
@@ -496,20 +553,22 @@ construct_five_networks <- function(empirical_edgelist,
   set.seed(base_seed + 20) # Specific block for Y
   y_coordinates <- square_edge_size * randomLHS(N_nodes, 1)
   
-  # Optimize grid
+  # Initiate grid search
   network_grid <- grid_optimization(empirical_net = empirical_graph,
                                     kappa_grid = kappa_grid,
                                     tau_grid = tau_grid,
                                     lambda_grid = lambda_grid,
                                     base_seed = base_seed + 30)
+
+  # Save optimized parameter combination based on KS distance
   optimal_net <- network_grid[which.min(network_grid$ks_dist), ]
   
   # Get optimal grid parameters
   optimal_parameters <- c(optimal_net$lambda, 
                           optimal_net$tau,
                           optimal_net$kappa)
-
-  # Construct network with these parameters
+  
+  # Construct final network with optimized parameters
   spatial_graph <- construct_network(parameters = optimal_parameters,
                                      N_nodes_large = N_nodes, 
                                      x_coordinates,
@@ -522,47 +581,65 @@ construct_five_networks <- function(empirical_edgelist,
     stop("\nError: spatial graph not constructed. Aborting process...\n")
   }
   
-  ### Generators 2 and 3: Stochastic Block Model
+
+  ## Step 2: Generate network with SBM and DCSBM
   
   cat("\nStarting SBM and DCSBM graph construction.\n")
   
   # Turn empirical network into adjacency matrix
   A <- as.matrix(as_adjacency_matrix(empirical_graph, sparse = FALSE))
   
-  # Define the range of K values to test
+  # Re-set seed because of RNG
   set.seed(base_seed + 100) 
-  BIC_emp <- randnet::LRBIC(A, Kmax = K_max, model = "both") # Bayesian Information Criterion (BIC) likelihood 
-  k_hat_sbm = BIC_emp$SBM.K # 13 communities
-  k_hat_dcsbm <- BIC_emp$DCSBM.K # 6 communities
 
+  # Bayesian Information Criterion (BIC) likelihood using 'K_max' as set in function arguments
+  # and adjacency matrix 'A'. Test both models (SBM and DCSBM).
+  BIC_emp <- randnet::LRBIC(A, Kmax = K_max, model = "both") 
+
+  # Save number of communities for SBM and DCSBM
+  k_hat_sbm = BIC_emp$SBM.K 
+  k_hat_dcsbm <- BIC_emp$DCSBM.K 
+  
   # We re-perform this if the number of optimal communities equals the number of maximum communities
-  if(k_hat_sbm == K_max | k_hat_dcsbm == K_max){
-    new_K_max = K_max + 1
-    BIC_emp <- randnet::LRBIC(A, Kmax = new_K_max, model = "both") 
-    k_hat_sbm = BIC_emp$SBM.K # 13 communities
-    BIC_emp$SBM.BIC # BIC values
-    k_hat_dcsbm <- BIC_emp$DCSBM.K # 6 communities
-    BIC_emp$DCSBM.BIC # BIC values
-  } 
+  # Increasing K should not affect the graph's optimal K if it does not currently exceed K_max
+  # E.g., if K_max = 10, SBM.K is 10 and DCSBM.K is 6, increasing K_max may change SBM.K to 11 (or not)
+  # but should not change DCSBM.K from 6 to 7 or higher. 
+  while(k_hat_sbm == K_max | k_hat_dcsbm == K_max){
+    
+    # Increase by increments of 1
+    cat("Maximum K has been reached. Increasing K by 1.\n")
+    K_max <- K_max + 1
+
+    # Recalculate BIC and community number
+    BIC_emp <- randnet::LRBIC(A, Kmax = K_max, model = "both") 
+    k_hat_sbm <- BIC_emp$SBM.K 
+    k_hat_dcsbm <- BIC_emp$DCSBM.K
+  }
   
   # Print communities 
   cat(paste0("\nSBM has ", k_hat_sbm, " communities and DCSBM has ", k_hat_dcsbm, " communities.\n"))
   
-  # We use the number of communities to assign clusters and estimate the models
+  # Save for later inspection
+  communities <- list(sbm_com = k_hat_sbm,
+                      dcsbm_com = k_hat_dcsbm)
+  
+  # We use the number of communities to assign clusters with RSSP
+  # We do NOT use the Laplacian matrix here!
   set.seed(base_seed + 110) 
   if(k_hat_sbm > 1){
-    communities_sbm <- reg.SSP(A,K=k_hat_sbm,lap=FALSE) # because NOT degree-corrected
+    communities_sbm <- reg.SSP(A,K=k_hat_sbm,lap=FALSE) 
     sbm_generated <- SBM.estimate(A, communities_sbm$cluster)
-    
+  
+  # If no communities were detected, all have membership to the same community
   } else {
     communities_sbm <- rep(1, empirical_nodes)
     sbm_generated <- SBM.estimate(A, communities_sbm)
   }
-    
-  # Repeat for DCSBM
+  
+  # Repeat for DCSBM: now we DO use the Laplacian matrix
   set.seed(base_seed + 120)
   if(k_hat_dcsbm > 1){
-    communities_dcsbm <- reg.SSP(A,K=k_hat_dcsbm,lap=TRUE) # because degree-corrected
+    communities_dcsbm <- reg.SSP(A,K=k_hat_dcsbm,lap=TRUE) 
     dcsbm_generated <- DCSBM.estimate(A, communities_dcsbm$cluster)
     
   } else {
@@ -570,12 +647,13 @@ construct_five_networks <- function(empirical_edgelist,
     dcsbm_generated <- DCSBM.estimate(A, communities_dcsbm)
   }
   
-  # Generate graph from model
+  # Use g and B from sbm_generated to create graph
   sbm_graph <- generate_sbm_graph(num_nodes = empirical_nodes, 
                                   c = sbm_generated$g, 
                                   B = sbm_generated$B,
                                   seed = base_seed + 130)
   
+  # Use Phat from dcsbm_generated to create graph
   dcsbm_graph <- generate_dcsbm_graph(num_nodes = empirical_nodes, 
                                       Phat = dcsbm_generated$Phat,
                                       seed = base_seed + 140)
@@ -586,27 +664,14 @@ construct_five_networks <- function(empirical_edgelist,
     stop("\nError: either SBM or DCSBM not constructed. Aborting process...\n")
   }
   
-  ### Generator 4: ReCon
-  
-  #cat("\nStarting adapted ReCoN algorithm graph construction.\n")
-  
-  #recon_graph <- recon_generator(empirical_graph, x, steps)
-  
-  # if(exists("recon_graph")){
-  #   cat("\nRecon_graph constructed. Moving on to next algorithm.\n")
-  # } else {
-  #   stop("\nError: either ReCoN graph not constructed. Aborting process...\n")
-  # }
-  
-  ### Generator 5: random network
+  ## Step 3: Generate Erdos-Renyi (random) graph
   
   cat("\nStarting random graph construction.\n")
   
   # Create random Erdos & Renyi graph: edges = empirical edges
-  set.seed(base_seed + 300)
-  random_graph = igraph::erdos.renyi.game(empirical_nodes, 
+  set.seed(base_seed + 400)
+  random_graph = igraph::sample_gnm(empirical_nodes, 
                                           empirical_edges,
-                                          "gnm",
                                           FALSE, 
                                           FALSE)
   
@@ -615,202 +680,28 @@ construct_five_networks <- function(empirical_edgelist,
   } else {
     stop("\nError: random graph not constructed. Aborting process...\n")
   }
+
+  ## Step 5: list and return results 
   
-  # Create list of graphs
+  # Create list of graphs, including empirical graph
   graph_list <- list(empirical_graph = empirical_graph, 
                      spatial_graph = spatial_graph, 
                      sbm_graph = sbm_graph, 
                      dcsbm_graph = dcsbm_graph, 
                      random_graph = random_graph)
-  cat(paste0("\nUsed the following parameters for grid optimization. Kappa = ", optimal_net$kappa, 
+  # Report the parameters used for SENCA
+  cat(paste0("\nUsed the following parameters for graph optimization. Kappa = ", optimal_net$kappa, 
              "; Tau = ", optimal_net$tau, "; Lambda = ", optimal_net$lambda, ".\n"))
   
-  
-  # Return graph list
-  return(graph_list)
-  
-}
-
-
-### Function to summarize these graphs
-summarize_graph_list <- function(graph_list){
-  
-  # Iterate over the list and calculate metrics for each graph
-  results_list <- lapply(seq_along(graph_list), function(i) {
-    
-    # Get each graph
-    g <- graph_list[[i]]
-    graph_name <- names(graph_list)[i]
-    
-    # Calculate degree 
-    degrees <- igraph::degree(g)
-    
-    # Betweenness
-    betweenness <- igraph::betweenness(g)
-    
-    # Calculate metrics
-    nodes <- igraph::vcount(g)
-    edges <- igraph::ecount(g)
-    density <- igraph::edge_density(g)
-    
-    # Average Local Clustering Coefficient: calculated as the mean of the local clustering
-    # coefficients of all vertices.
-    clust_coeff <- igraph::transitivity(g, type = "average")
-    
-    # Average Path Length: 'unconnected = TRUE' ensures a result is returned even
-    # if the graph is disconnected (mean of finite distances).
-    path_length <- igraph::mean_distance(g, unconnected = TRUE)
-    
-    # Degree metrics
-    avg_degree <- mean(degrees)
-    med_degree <- median(degrees)
-    max_degree <- max(degrees)
-    
-    # Eigen centrality
-    eigen <- eigen_centrality(g)
-    
-    # Create a single-row data frame
-    data.frame(
-      Graph = graph_name,
-      Nodes = nodes,
-      Edges = edges,
-      Density = density,
-      Avg_Clustering_Coefficient = clust_coeff,
-      Avg_Path_Length = path_length,
-      Avg_Degree = avg_degree,
-      Med_Degree = med_degree,
-      Max_Degree = max_degree,
-      Avg_Betweenness = mean(betweenness),
-      Med_Betweenness = median(betweenness),
-      Max_Betweenness = max(betweenness),
-      stringsAsFactors = FALSE)
-  })
-  
-  # Combine all single-row data frames into one
-  network_metrics <- do.call(rbind, results_list)
-  
-  return(network_metrics)
+  # Return graph list, including the optimal parameters for SENCA and communities for SBM/DCSBM
+  list(graph_list = graph_list,
+       best_params = optimal_net,
+       communities = communities)
   
 }
-
-
-### Function to plot over graph_list
-plot_consistent_networks <- function(graph_list, layout_type = "fr") {
-  
-  # We use the first graph as the reference for layout calculation
-  ref_graph <- graph_list[[1]]
-  
-  # Calculate the fixed layout coordinates ONCE
-  cat(paste0("Calculating fixed layout using '", layout_type, "' from the reference graph...\n"))
-  
-  # Generate the plots by applying the fixed layout to all graphs
-  plots <- lapply(seq_along(graph_list), function(i) {
-    g <- graph_list[[i]]
-    graph_name <- names(graph_list)[i]
-    
-    cat(paste0("Generating plot for: ", graph_name, "\n"))
-    
-    # Create the ggraph object, explicitly using the pre-calculated layout
-    p <- ggraph(g, layout = layout_type) +
-      geom_edge_fan(
-        alpha = 0.5, 
-        edge_width = 0.3, 
-        edge_colour = "gray50") +
-      geom_node_point(
-        size = 3, 
-        color = "#1e3a8a",  # Dark Blue color
-        alpha = 0.8) +
-      theme_graph() + # A clean theme designed for ggraph
-      labs(title = paste("Network:", graph_name)) +
-      
-      # Make sure the plot area is square and the coordinates are fixed
-      coord_fixed()
-    
-    return(p)
-  })
-  
-  # Filter out any NULL results
-  plots <- plots[!sapply(plots, is.null)]
-  
-  # Combine in one plot
-  combined_plot <- patchwork::wrap_plots(plots, ncol = 3, nrow = 2) +
-    patchwork::plot_annotation(
-      title = "Graph Generator Comparison",
-      theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5)))
-  
-  return(combined_plot)
-}
-
-
-### Function to compare KS distances
-compare_ks_distances <- function(graph_list, country_name, location_name){
-  
-  # Create empty df for ks distances
-  ks_distances <- data.frame(
-    graph1 = as.character(), 
-    graph2 = as.character(), 
-    ks_dist = as.numeric())
-  
-  # Get names of all graphs
-  graph_names <- names(graph_list)
-  
-  # Create all pairwise combinations (including self-comparison)
-  graph_pairs <- expand.grid(graph1 = graph_names, graph2 = graph_names, stringsAsFactors = FALSE)
-  
-  # Get KS distance between all pairs
-  calculate_distance <- function(name1, name2) {
-    g1 <- graph_list[[name1]]
-    g2 <- graph_list[[name2]]
-    
-    # Calculate degree distributions
-    degree_g1 <- igraph::degree(g1)
-    degree_g2 <- igraph::degree(g2)
-    
-    # Get the Kolmogorov-Smirnov D statistic
-    ks_dist <- ks_distance(degree_g1, degree_g2)
-    return(ks_dist)
-  }
-  
-  # Get final comparison dataframe
-  ks_distances <- graph_pairs
-  ks_distances$ks_dist <- mapply(
-    calculate_distance, 
-    ks_distances$graph1, 
-    ks_distances$graph2)
-  
-  # Create levels for correct plotting
-  ks_distances <- ks_distances %>%
-    mutate(graph1 = factor(graph1, levels = c("empirical_graph",
-                                              "spatial_graph",
-                                              "sbm_graph",
-                                              "dcsbm_graph",
-                                              "random_graph")),
-           graph2 = factor(graph2, levels = c("empirical_graph",
-                                              "spatial_graph",
-                                              "sbm_graph",
-                                              "dcsbm_graph",
-                                              "random_graph"))) %>%
-    # Add a column for the country and the location
-    mutate(country = country_name, 
-           location = location_name)
-  
-  # Correlation plot
-  ks_heat <- ggplot(ks_distances, aes(x = graph1, y = graph2, fill = ks_dist)) +
-    geom_tile() +
-    theme_minimal() +
-    theme(text = element_text(size = 20),
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          axis.title.x=element_blank(),
-          axis.title.y=element_blank()) +
-    labs(title = location_name)
-  
-  # Return df and plot
-  list(plot = ks_heat,
-       df = ks_distances)
-  
-}
-
+#-------------------------------------------------------------------------------------------------------------------------
 
 ### End of script ###
 
-save.image(file = "constructNetworksFunction.RData")
+# Save workspace image if desired. Not in GitHub repo. 
+# save.image(file = "HelperFunctions.RData")

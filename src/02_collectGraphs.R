@@ -1,14 +1,14 @@
 ###########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
-# Created: 22 December 2025; Last edited: 13 January 2026
-# Script compares different network construction algorithms
+# Created: December 2025; Last edited: September 2026
+# In this script, we create an empirical and various synthetic networks using network generator algorithms. 
 
-# Legend of script:
+# IMPORTANT NOTES:
+# 0. The is a standalone script. There is no corresponding .sh script. 
+# 1. This script requires the output of the 01 script. 
 
-### IS FOR NEW SECTIONS IN CAPITAL ###
-### Is for headings (e.g., a new function)
-# is for 'small' commands (e.g., rename or merge)
+# For any issues, feel free to report a new issue on this GitHub repo or contact inez.derkx@swisstph.ch
 
 ##########################################################################################################################
 
@@ -30,31 +30,32 @@ library(data.table)
 LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
 setwd(LOCAL_ROOT_DIR)
 
-# Output folders
-ifelse(!dir.exists(file.path(LOCAL_ROOT_DIR, "Net_Sens")),
-       dir.create(file.path(LOCAL_ROOT_DIR, "Net_Sens")), FALSE)
+# Output folders and paths. 
 out_path <- file.path(LOCAL_ROOT_DIR, "Net_Sens")
 ifelse(!dir.exists(file.path(out_path, "Plots")),
        dir.create(file.path(out_path, "Plots")), FALSE)
 
 ##########################################################################################################################
 
+### Helper functions
 
-### Set functions
-
-# 0. Helper function
-get_task_id <- function(filename) {
-  as.integer(sub(".*_(\\d+)_seed_\\d+\\.rds$", "\\1", basename(filename)))
-}
-
+#-------------------------------------------------------------------------------------------------------------------------
 # 1. Function to summarize graphs
 summarize_graphs <- function(path,
                              csv_pattern,
                              seed_nr,
                              max_task_id = NULL){
-  
-  
-  # First adapt out path to seed
+
+  # This function creates summaries of all generated graphs from script 01. 
+  #' @param: 'path': path where results df is stored ("results_seed_", base_seed, "_seed_", max_seed, ".csv")
+  #' @param: 'csv_pattern': pattern for file name recognition, e.g. "results_seed_(\\d+)_seed_.*\\.csv" from above.
+  #' @param: 'seed_nr': should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
+  #' @param: 'max_task_id': number of array tasks that will be summarized
+  #' @return: A summary dataframe. The function saves and plots this file automatically
+
+  ## Step 1: Source and gather files
+
+  # Adapt path to seed number to locate csv files 
   seed <- paste0("Seed_", seed_nr)
   csv_path <- file.path(path, seed)
   
@@ -67,7 +68,7 @@ summarize_graphs <- function(path,
   ifelse(!dir.exists(output_path),
          dir.create(output_path), FALSE)
   
-  # Aggregate results from all graphs
+  # list all ouptut files 
   file_list <- list.files(path = csv_path, 
                           pattern = csv_pattern, 
                           full.names = TRUE)
@@ -80,8 +81,10 @@ summarize_graphs <- function(path,
     file_list <- file_list[!is.na(base_seeds) & base_seeds <= max_base_seed]
   }
   
-  # Combine all csv files in one df
+  # Combine all csv files in one dataframe
   sensitivity_data <- do.call(rbind, lapply(file_list, read.csv))
+
+  ## Step 2: Transform and save summary data
   
   # Save in new summary file
   summary_check <- sensitivity_data %>%
@@ -90,19 +93,25 @@ summarize_graphs <- function(path,
     tidyr::pivot_longer(cols = Avg_Degree:Opt_Kappa, 
                         names_to = c("Params"),
                         values_to = c("Values")) %>%
+
+    # Save only one replicate > in previous script we checked that all should be identical.
     dplyr::filter(Replicate == 1) %>%
     dplyr::mutate(SeedTotal = max_task_id)
   
-  # Save summary file — include task ID subset in filename if filtered
+  # Set summary file name — include task ID subset in filename if filtered
   summary_filename <- if (!is.null(max_task_id)) {
     paste0("summary_check_top", max_task_id, ".csv")
   } else {
     "summary_check.csv"
   }
+  
+  # Set path to save
   summary_path <- file.path(csv_path, summary_filename)
   write.csv(summary_check, summary_path, row.names = FALSE)
+
+  ## Step 3: Plot summary data for diagnostics
   
-  # Plot summary file
+  # Help plot: this plot is for examination of data. It is not a final plot!
   params_summary <- ggplot(summary_check, aes(x = Graph, 
                                               y = Values, 
                                               group = Graph,
@@ -118,39 +127,48 @@ summarize_graphs <- function(path,
     theme(axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "bottom")
   
-  # Save plot — include task ID subset in filename if filtered
+  # Plot file nam — include task ID subset in filename if filtere
   plot_name <- if (!is.null(max_task_id)) {
     paste0("params_summary_seed_", seed_nr, "_top", max_task_id, ".png")
   } else {
     paste0("params_summary_seed_", seed_nr, ".png")
   }
+
+  # Save path and plot
   plot1_path <- file.path(plots_path, plot_name)
   ggsave(plot1_path, params_summary, width = 10, height = 10)
-  
   cat(paste0("Parameter summary has been saved to: ", plot1_path, ".\n"))
   
+  # Return summary file
   return(summary_check)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
+#-------------------------------------------------------------------------------------------------------------------------
 # 2. Function to select graph matches 
 select_matches <- function(path, 
                            graph_types, 
                            graph_pattern, 
-                           n_to_keep,
+                           n_to_keep = 100,
                            mypalette,
                            seed_nr,
                            max_task_id){
   
   
-  # Function to examine and select graphs for disease modelling:
-  #' @param path
-  #' @param graph_types 
-  #' @param graph_pattern
-  #' @param n_to_keep
-  #' @param mypalette
-  #' @param seed_nr
-  #' @param max_task_id
-  
+  # The main goal of this function is to find the 'n_to_keep' number of files (default = 100) that would best represent
+  # the average degree distribution of a specific graph type based on all 5000 graphs. For more details on this logic, 
+  # read the methods section of the corresponding manuscript. 
+  #' @param 'path': base path containing folder with graphs 
+  #' @param 'graph_types': string of graph types (e.g. ("spatial", "sbm", "dcsbm", "random", "newclust_graph"))
+  #' @param 'graph_pattern' : pattern string (e.g. "vetted_graphs_task_.*\\.rds") for file recognition
+  #' @param 'n_to_keep': how many graphs to keep for downstream analysis? Default = 100
+  #' @param 'mypalette': what colour palette are you using for your diagnostics graphs?
+  #' @param: 'seed_nr': should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
+  #' @param: 'max_task_id': number of array tasks that will be summarized
+  #' @return: final ensemble of graphs to use for SEIR/SIS simulations
+
+  ## Step 1: Set paths
+
   # First adapt out path to seed
   seed <- paste0("Graphs/Seed_", seed_nr)
   graphs_path <- file.path(path, seed)
@@ -165,11 +183,21 @@ select_matches <- function(path,
          dir.create(output_path), FALSE)
   
   
-  ### Function set up: helper functions and files
+  ## Step 2: create helper functions
   
-  # Helper function: get degree summary stats for comparison
+  # Helper function 1: get degree summary stats for comparison
   get_degree_stats <- function(g) {
+
+    # This function takes a graph and calculates six degree statistics:
+    # The minimum, 0.25 quantile, mean, median, 0.75 quantile, and max,
+    # as to capture the full shape of the graph's degree distribution. 
+    #' @param 'g': an igraph graph object
+    #' @return the summary stats
+
+    # Get the degrees of graph g
     d <- as.numeric(igraph::degree(g))
+
+    # Calculate stats
     stats <- c(
       min  = min(d),
       q25  = quantile(d, 0.25, names = FALSE),
@@ -177,14 +205,27 @@ select_matches <- function(path,
       median = median(d),
       q75  = quantile(d, 0.75, names = FALSE),
       max  = max(d))
+    
+    # Return stats
     return(stats)
   }
   
-  # Helper function: compute KS distance between two degree distributions
+  # Helper function 2: Kolmogorov-Smirnov distance
   get_ks_dist <- function(g_candidate, g_empirical) {
+
+    # This function computes the KS distance between two degree distributions
+    # ks.test is part of the stats packagea
+    #' @param 'g_candidate': candidate graph (igraph object)
+    #' @param 'g_empirical': empirical graph (igraph object)
+    #' @return KS distance statistic
+
+    # Ensure both graphs exist
     if (is.null(g_candidate) || is.null(g_empirical)) return(NA)
+
+    # Calculate degrees
     d1 <- as.numeric(igraph::degree(g_candidate))
     d2 <- as.numeric(igraph::degree(g_empirical))
+
     # ks.test returns a list; 'statistic' is the D value (distance)
     return(as.numeric(ks.test(d1, d2)$statistic))
   }
@@ -445,7 +486,9 @@ select_matches <- function(path,
   # Return the ensemble file
   return(final_ensemble)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
+#-------------------------------------------------------------------------------------------------------------------------
 # 3. Function to compute Mahalanobis distance
 mh_distance <- function(path, graph_types, graph_pattern){
   
@@ -561,6 +604,9 @@ mh_distance <- function(path, graph_types, graph_pattern){
   return(results)
   cat("\n--- Analysis Complete. ---\n")
 }
+#-------------------------------------------------------------------------------------------------------------------------
+
+##########################################################################################################################
 
 
 ### Apply functions

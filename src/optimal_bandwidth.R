@@ -1,3 +1,13 @@
+###########################################################################################################################
+
+# Script by Inez Derkx, contact: inez.derkx@swisstph.ch
+# Created: May 2026; Last edited: September 2026
+# This script is an analysis addendum. It examines whether the chosen bandwidth in the manuscript for outbreak threshold
+# is correctly chosen. 
+
+##########################################################################################################################
+
+
 # Function to find optimal bandwidth
 find_optimal_bw <- function(values, 
                             bw_range = seq(0.1, 0.8, by = 0.05),
@@ -101,8 +111,3 @@ hist(size_and_duration$dynamic_threshold)
 size_and_duration[, outbreak_type := ifelse(final_size <= dynamic_threshold, 
                                             "Minor", 
                                             "Major")]
-table(size_and_duration$outbreak_type)
-79718 / 151695
-
-
-79500 / 151913

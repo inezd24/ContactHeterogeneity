@@ -11,8 +11,11 @@
 ml purge
 ml R/4.2.1-foss-2022a # Load R version 4.2.1
 
+# Script requirements
 OFFSET=${OFFSET:-0}
 ACTUAL_ID=$((SLURM_ARRAY_TASK_ID + OFFSET))
 R_SCRIPT="01a_Run_NCRG.R"
+
+# Run script
 echo "Processing Task ID: $ACTUAL_ID"
 Rscript $R_SCRIPT $ACTUAL_ID
