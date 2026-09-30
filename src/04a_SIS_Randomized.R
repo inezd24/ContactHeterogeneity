@@ -1,15 +1,25 @@
-###########################################################################################################################
-
+##########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
-# Created: 19 January 2026; Last edited: 19 January 2026
-# SEIR Simulation script updated for Randomized Sampling & SLURM Integration
-# Non-factorial approach
+# Created: January 2026; Last edited: September 2026
+# This script produces S-I-S modeled disease outbreak simulations using a randomized sampling approach, as per the main
+# methodology of the corresponding Derkx et al. (2026) manuscript. 
+
+# IMPORTANT NOTES:
+# 1. This script relies on a .sh script with identical name for execution. 
+# 2. Very important: you HAVE to check the SLURM script and adapt it. It has instructions written in it. 
+# 3. Note that the SIS model is only run for the Chad network in the manuscript. Hence the file location is in the 
+#    SLURM script. Check its path there.
+# 5. The beta values (transmission rates) are pre-defined in this script, as they are not varied throughout the 
+#    manuscript. If you want to change this, do so manually.
+# 6. Same for delta values (3-9 days)
 
 
-####################################################################################################
+# For any issues, feel free to report a new issue on this GitHub repo or contact inez.derkx@swisstph.ch
+
+##########################################################################################################################
+
 ### SET-UP R ENVIRONMENT
-####################################################################################################
 
 # Empty list
 rm(list = ls())
@@ -30,36 +40,41 @@ setwd(LOCAL_ROOT_DIR)
 N_CORES <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = 2))
 
 
-####################################################################################################
-### HELPER FUNCTIONS
-####################################################################################################
+##########################################################################################################################
 
-# 1. Neighbor list: computes all neighbors of each node
+### Helper functions 
+
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 1: Compute neighbour list
 neighbor_list <- function(g) {
   
-  # This function has the following arguments: 
-  #' @g This is an igraph graph object
-  
+  # This function takes a graph and computes a list of the neighbours of all individuals
+  #' @param g: This is an igraph graph object
+  #' @return list of integers with neighbours
+
   # calculate the neighbors and turn into integer
   lapply(adjacent_vertices(g, V(g), mode = "all"), as.integer)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# 2. S, I, S function 
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 2: S-I-S simulation
 sis_discrete <- function(nbs, start, delta, beta) {
   
   # This function has the following arguments: 
-  #' @nbs The precomputed list of neighbors from neighbor_list().
-  #' @start The ID of the node where the outbreak begins.
-  #' @delta The mean duration a node is infectious (in days), for a Poisson distribution.
-  #' @beta The transmission probability per edge per day.
-  
-  ### Initialize vectors
+  #' @param nbs: The precomputed list of neighbors from neighbor_list().
+  #' @param start: The ID of the node where the outbreak begins.
+  #' @param delta: The mean duration a node is infectious (in days), for a Poisson distribution.
+  #' @param beta: The transmission probability per edge per day.
+  #' @return list with outbreak summary
+
+  ## Step 1: Initialize vectors
   
   # N: Number of individuals (taken from list of neighbours)
   N <- length(nbs)
   
   # S: A vector to track the state of each node (0=S, 1=E, 2=I, 3=D).
-  # IMPORTANT: S here stands for state, not for susceptible!!
+  # IMPORTANT: S here stands for state, not for susceptible!
   S <- integer(N)    
   
   # Tleft: A vector of integers to act as timers for exposed and infectious nodes.
@@ -77,7 +92,6 @@ sis_discrete <- function(nbs, start, delta, beta) {
   infectious <- start
   
   # Initiate the time step (day) of the simulation
-  # time_step <- 1L
   time_step <- 0L # start at day 0 
   
   # The total infection events (S -> E)
@@ -87,16 +101,14 @@ sis_discrete <- function(nbs, start, delta, beta) {
   infectious_per_day <- length(infectious)
   
   
-  ### The actual simulation loop
+  ## Step 2: initiate the simulation loop
   
   
   # The simulation continues as long as there are infectious nodes.
   # A max of 1000 days is set, but this is a number that is very unlikely to be reached
   while (length(infectious) > 0L && time_step < 1000) {
     
-    
-    ### Recovery (I > S)
-    
+    ## Step 2.1 Transitions: I > S
     
     # Check if there is anyone in the infectious class
     if (length(infectious) > 0L) {
@@ -118,8 +130,7 @@ sis_discrete <- function(nbs, start, delta, beta) {
       }
     }
     
-    
-    ### New infections (S > I)
+    ## Step 2.2 Transitions: S > I
     
     # New infections are based on nodes that were Infectious at the start of this step
     if (length(infectious) > 0L) {
@@ -164,30 +175,8 @@ sis_discrete <- function(nbs, start, delta, beta) {
     
   }
   
-  
-  ### Recovery (I > S)
-  
-  # We check which infected nodes have a timer of 1 or less (time to recover).
-  # if (length(infectious) > 0L) {
-  #  keep_infected <- Tleft[infected] > 1L
-  #  recovered_nodes <- infected[!keep_infected]
-  
-  # If there are recovered nodes
-  #  if (length(recovered_nodes) > 0L) {
-  
-  # Move back to susceptible state
-  #   S[recovered_nodes] <- 0L
-  # }
-  
-  # Update the list of currently infected nodes and decrement their timers.
-  # infected <- infected[keep_infected]
-  # Tleft[infected] <- Tleft[infected] - 1L
-  # }
-  
-  # Store the count of infected nodes at the end of the day.
-  # infected_per_day <- c(infected_per_day, length(infected))
-  #  }
-  
+  ## Step 3: Return list
+
   # Return all results for comprehensive analysis
   return(list(
     infectious_per_day = infectious_per_day,
@@ -195,185 +184,49 @@ sis_discrete <- function(nbs, start, delta, beta) {
     N = N,
     simulation_duration = time_step)) # Exclude the initial day because day 0
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# 4 selecting graph type
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 3: Selecting graphs
 get_graph <- function(graph_type, graph_idx) {
-  
+
+  # This function handles looking up a graph type and id
+  #' @param graph_type: which of five graph types you are looking up
+  #' @param graph_idx: the index of the graph you are looking up
+  #' @return graph 
+
   # Ensure we are dealing with a single string, not a vector
   type_val <- as.character(graph_type[1])
   
-  # 1. Handle Empirical
+  ## Step 1. Handle Empirical
   if (type_val == "empirical") {
     
     # Assuming your lookup has a specific structure for empirical
     return(graph_lookup$empirical$empirical)
   }
   
-  # 2. Handle Synthetic
+  ## Step 2. Handle Synthetic
   if (type_val %in% names(graph_lookup$synthetic)) {
     
-    # Pull the specific instance. Note the [[1]] to ensure we have a single index.
+    # Pull the specific instance. 
+    # If you are uncertain, check the hierarchical listing structure where graphs are stored
     idx_val <- as.integer(graph_idx[1])
     return(igraph::upgrade_graph(graph_lookup$synthetic[[type_val]][[idx_val]][[2]]))  
   }
   
   stop("Unknown graph type: ", type_val)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-
-####################################################################################################
-### EXECUTION BLOCK
-####################################################################################################
-
-# Set script arguments
-args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 5) {
-  stop("Usage: Rscript script.R <graph_file> <master_seed> <total_tasks> <sims_per_task> <n_graphs>")
-}
-
-# Detail six arguments
-GRAPH_FILE     <- args[1]
-MASTER_SEED    <- as.integer(args[2])
-TOTAL_TASKS    <- as.integer(args[3])
-SIMS_PER_TASK  <- as.integer(args[4])
-N_GRAPHS       <- as.numeric(args[5])
-
-# Obtain task id from system
-TASK_ID <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID", "0"))
-
-# Set total number of simulations
-N_TOTAL_SIMS <- TOTAL_TASKS * SIMS_PER_TASK
-cat("Task:", TASK_ID, "; Master seed:", MASTER_SEED, "\n")
-
-
-####################################################################################################
-### LOAD GRAPHS
-####################################################################################################
-
-# Read graphs from graph file
-synthetic_graphs <- readRDS(GRAPH_FILE)
-
-# Load empirical graph
-vetted_graphs <- readRDS(sprintf("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"))
-emp_graph <- igraph::upgrade_graph(vetted_graphs$anchor)
-rm(vetted_graphs)
-
-# Add to graphs
-graph_lookup <- list(
-  synthetic = synthetic_graphs,
-  empirical = list(empirical = emp_graph))
-
-
-
-################################################################################
-### BALANCED SAMPLING ACROSS GRAPH TYPES
-################################################################################
-
-
-# Set graph indices
-graph_indices <- 1:N_GRAPHS
-
-# Set beta levels
-beta_levels <- seq(0.01, 0.20, by = 0.005)
-
-# Set delta levels
-delta_levels <- seq(3,9, by = 1)
-
-# For empirical and synthetic graphs
-graph_registry <- list(
-  "dcsbm" = list(
-    source = "synthetic",
-    indices = 1:100),
-  "random" = list(
-    source = "synthetic",
-    indices = 1:100),
-  "sbm" = list(
-    source = "synthetic",
-    indices = 1:100),
-  "spatial" = list(
-    source = "synthetic",
-    indices = 1:100),
-  "newclust_graph" = list(
-    source = "synthetic",
-    indices = 1:100),
-  "empirical" = list(
-    source = "empirical",
-    indices = NA_integer_))
-
-# Get graph types from graph registry
-graph_types <- names(graph_registry)
-
-# E.g. if total simulations is 20000, we run 5000 per graph type
-sims_per_graph_type <- N_TOTAL_SIMS / length(graph_types)
-
-# Make sure it's an integer
-if(sims_per_graph_type != floor(sims_per_graph_type)) {
-  stop("N_TOTAL_SIMS must be divisible by number of graph types")
-}
-
-task_grids <- lapply(graph_types, function(gtype) {
-  
-  # Set a unique seed per graph type for reproducibility
-  set.seed(MASTER_SEED + which(graph_types == gtype))
-  
-  # A. Generate the Random Parameters
-  # We use replace = TRUE to ensure true independent random draws
-  sampled <- data.frame(
-    beta = sample(beta_levels, size = sims_per_graph_type, replace = TRUE),
-    delta = sample(delta_levels, size = sims_per_graph_type, replace = TRUE),
-    graph_type = gtype
-  )
-  
-  # B. Assign Graph Indices randomly (Synthetic) or NA (Empirical)
-  if (!is.na(graph_registry[[gtype]]$indices[1])) {
-    sampled$graph_idx <- sample(graph_indices, size = sims_per_graph_type, replace = TRUE)
-  } else {
-    sampled$graph_idx <- NA_integer_
-  }
-  
-  # C. Generate unique simulation seeds
-  # This is the "ID" of the specific stochastic outbreak
-  sampled$sim_seed <- sample.int(.Machine$integer.max, size = sims_per_graph_type)
-  
-  return(sampled)
-})
-
-# --- 2. Final Assembly ---
-task_grid <- dplyr::bind_rows(task_grids)
-
-# --- 3. The Global Shuffle ---
-# Still important for SLURM load balancing
-set.seed(MASTER_SEED + 123)
-task_grid <- task_grid[sample(nrow(task_grid)), ]
-
-# --- 4. Slicing for SLURM ---
-start_idx <- (TASK_ID) * SIMS_PER_TASK + 1
-end_idx   <- min(start_idx + SIMS_PER_TASK - 1, nrow(task_grid))
-task_grid <- task_grid[start_idx:end_idx, ]
-
-
-####################################################################################################
-### PARALLEL PLAN
-####################################################################################################
-
-# Set up parallelization with n cores
-future::plan(multisession, workers = N_CORES)
-
-# Print number of cores used > check if uses all available cores
-cat(
-  sprintf(
-    "Parallelization enabled using %d cores (future multisession).\n",
-    future::nbrOfWorkers()
-  )
-)
-
-####################################################################################################
-### RUN SIMULATIONS
-####################################################################################################
-
-
-# Run a single simulation
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 4: Run a single S-I-S simulation
 run_single_sim <- function(p) {
+  
+  # This function runs a single simulation of the SEIR model
+  #' @param p: the task grid 
+  #' @return list with summary output
+
+  ## Step 1: Set-up
   
   # Get the right graph from the graph file
   g <- get_graph(
@@ -400,6 +253,8 @@ run_single_sim <- function(p) {
   # Use seed from grid to set starting node
   set.seed(p$sim_seed)
   start_node <- sample.int(N, 1)
+
+  ## Step 2: Run simulation
   
   # Run discrete SEIR model
   sim_result <- sis_discrete(
@@ -408,6 +263,8 @@ run_single_sim <- function(p) {
     delta = p$delta,
     beta = p$beta)
   
+  ## Step 3: summarize output
+
   # Calculate daily active cases and deaths
   active_cases_daily <- sim_result$infectious_per_day
   
@@ -447,11 +304,163 @@ run_single_sim <- function(p) {
     # Total S-> E events (Total cases)
     total_infections = sim_result$total_infections)
   
-  # Output
+  # Return output
   list(summary = summary,
-       I = sim_result$infectious_per_day,
        N = sim_result$N)
 }
+#-------------------------------------------------------------------------------------------------------------------------
+
+
+##########################################################################################################################
+
+
+## Step 1: set-up
+
+# Set script arguments
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) < 5) {
+  stop("Usage: Rscript script.R <graph_file> <master_seed> <total_tasks> <sims_per_task> <n_graphs>")
+}
+
+# Set five arguments (see SLURM script for details)
+GRAPH_FILE     <- args[1]
+MASTER_SEED    <- as.integer(args[2])
+TOTAL_TASKS    <- as.integer(args[3])
+SIMS_PER_TASK  <- as.integer(args[4])
+N_GRAPHS       <- as.numeric(args[5])
+
+# Obtain task id from system
+TASK_ID <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID", "0"))
+
+# Set total number of simulations
+N_TOTAL_SIMS <- TOTAL_TASKS * SIMS_PER_TASK
+cat("Task:", TASK_ID, "; Master seed:", MASTER_SEED, "\n")
+
+
+## Step 2: Load graphs
+
+
+# Read graphs from graph file
+synthetic_graphs <- readRDS(GRAPH_FILE)
+
+# Empirical (all are identical)
+vetted_graphs <- readRDS(sprintf("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"))
+emp_graph <- igraph::upgrade_graph(vetted_graphs$anchor)
+rm(vetted_graphs)
+
+# Add to graphs
+graph_lookup <- list(
+  synthetic = synthetic_graphs,
+  empirical = list(empirical = emp_graph))
+
+
+## Step 3: balanced sampling across graph types
+
+
+# Set graph indices
+graph_indices <- 1:N_GRAPHS
+
+# Set beta levels
+beta_levels <- seq(0.01, 0.20, by = 0.005)
+
+# Set delta levels
+delta_levels <- seq(3,9, by = 1)
+
+# For empirical and synthetic graphs
+graph_registry <- list(
+  "dcsbm" = list(
+    source = "synthetic",
+    indices = 1:100),
+  "random" = list(
+    source = "synthetic",
+    indices = 1:100),
+  "sbm" = list(
+    source = "synthetic",
+    indices = 1:100),
+  "spatial" = list(
+    source = "synthetic",
+    indices = 1:100),
+  "newclust_graph" = list(
+    source = "synthetic",
+    indices = 1:100),
+  "empirical" = list(
+    source = "empirical",
+    indices = NA_integer_))
+
+# Get graph types from graph registry
+graph_types <- names(graph_registry)
+
+# E.g. if total simulations is 20000, we run 4000 per graph type for 5 graph types
+sims_per_graph_type <- N_TOTAL_SIMS / length(graph_types)
+
+# Make sure it's an integer
+if(sims_per_graph_type != floor(sims_per_graph_type)) {
+  stop("N_TOTAL_SIMS must be divisible by number of graph types")
+}
+
+# Create task grids
+task_grids <- lapply(graph_types, function(gtype) {
+  
+  # Set a unique seed per graph type for reproducibility
+  set.seed(MASTER_SEED + which(graph_types == gtype))
+  
+  # Generate the Random Parameters
+  # We use replace = TRUE to ensure true independent random draws
+  sampled <- data.frame(
+    beta = sample(beta_levels, size = sims_per_graph_type, replace = TRUE),
+    delta = sample(delta_levels, size = sims_per_graph_type, replace = TRUE),
+    graph_type = gtype
+  )
+  
+  # Assign Graph Indices randomly (Synthetic) or NA (Empirical)
+  if (!is.na(graph_registry[[gtype]]$indices[1])) {
+    sampled$graph_idx <- sample(graph_indices, size = sims_per_graph_type, replace = TRUE)
+  } else {
+    sampled$graph_idx <- NA_integer_
+  }
+  
+  # Generate unique simulation seeds
+  # This is the "ID" of the specific stochastic outbreak
+  sampled$sim_seed <- sample.int(.Machine$integer.max, size = sims_per_graph_type)
+  
+  # Return grid
+  return(sampled)
+})
+
+# Assemble task grid
+task_grid <- dplyr::bind_rows(task_grids)
+
+# We shuffle all rows from task grid 
+# This ensures that SLURM Task #1 isn't doing e.g. 500 DCSBM runs, 
+# but a mix of all graph types and betas.
+set.seed(MASTER_SEED + 123)
+task_grid <- task_grid[sample(nrow(task_grid)), ]
+
+# Slice for SLURM
+start_idx <- (TASK_ID) * SIMS_PER_TASK + 1
+end_idx   <- min(start_idx + SIMS_PER_TASK - 1, nrow(task_grid))
+
+# Final grid for a specific SLURM task
+task_grid <- task_grid[start_idx:end_idx, ]
+
+
+## Step 4: Set up parallelization 
+
+
+# Set up parallelization with n cores
+future::plan(multisession, workers = N_CORES)
+
+# Print number of cores used > check if uses all available cores
+cat(
+  sprintf(
+    "Parallelization enabled using %d cores (future multisession).\n",
+    future::nbrOfWorkers()
+  )
+)
+
+
+## Step 5: Run simulations
+
 
 # Run the single simulation over the whole task grid
 results <- furrr::future_map(
@@ -462,24 +471,8 @@ results <- furrr::future_map(
 # Add all summary results into one data frame
 summary_df <- rbindlist(lapply(results, `[[`, "summary"))
 
-# Turn counts (I, E, R) into time series
-timeseries_df <- rbindlist(lapply(seq_along(results), function(i) {
-  data.table(
-    sim_id = i,
-    day = seq_along(results[[i]]$I) - 1,
-    I = results[[i]]$I,
-    graph_type = summary_df$graph_type[i],
-    graph_idx  = summary_df$graph_idx[i],
-    beta       = summary_df$beta[i],
-    delta      = summary_df$delta[i],
-    seed       = summary_df$seed[i],
-    N          = results[[i]]$N)
-}))
 
-
-####################################################################################################
-### OUTPUT
-####################################################################################################
+## Step 6: Save output
 
 
 # Set new directory for output
@@ -491,7 +484,6 @@ if (!dir.exists(out_dir)) {
 
 # Save summary output
 saveRDS(summary_df, file.path(out_dir,sprintf("Summary_Task%03d_Seed%d_TotalSimulations%d.rds", TASK_ID, MASTER_SEED, N_TOTAL_SIMS)))
-saveRDS(timeseries_df, file.path(out_dir,sprintf("TimeSeries_Task%03d_Seed%d_TotalSimulations%d.rds", TASK_ID, MASTER_SEED, N_TOTAL_SIMS)))
 
 cat("Task", TASK_ID, "finished successfully\n")
 

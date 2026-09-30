@@ -1,19 +1,30 @@
-###########################################################################################################################
-
+##########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
-# Created: 14 January 2026; Last edited: 19 January 2026
-# SEIR Simulation script updated for Randomized Sampling & SLURM Integration
-# Non-factorial approach
+# Created: January 2026; Last edited: September 2026
+# This script produces S-E-I-R modeled disease outbreak simulations using a factorial sampling approach. This approach
+# is discussed in the methods of the corresponding Derkx et al. (2026) article, but not used in the main analyses. 
 
+# IMPORTANT NOTES:
+# 1. This script relies on a .sh script with identical name for execution. 
+# 2. Very important: you HAVE to check the SLURM script and adapt it. It has instructions written in it. 
+# 3. Note the script is nearly identical to the 03a script, apart from its sampling approach 
+# 3. Als note that this script is not performed for all locations, as it was just used as a methods check
+# 4. The beta values (transmission rates) are pre-defined in this script, as they are not varied throughout the 
+#    manuscript. If you want to change this, do so manually.
+# 5. You have to change the path of where the data is stored in the .sh file.  
 
-####################################################################################################
-### SET-UP R ENVIRONMENT
-####################################################################################################
+##########################################################################################################################
 
-# Set-up R environment
+### SET UP R ENVIRONMENT ###
+
+# Empty environment
 rm(list = ls())
 
+# Set working directory
+setwd("/scicore/home/chitnis/derkx0000/GraphComparison")
+
+# Load required libraries
 suppressPackageStartupMessages({
   library(igraph)
   library(dplyr)
@@ -21,39 +32,43 @@ suppressPackageStartupMessages({
   library(data.table)
 })
 
-# Set local root directory
+# Set local root directory where the simulation folders reside.
 LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
 setwd(LOCAL_ROOT_DIR)
 
-# Set cores for parallel processing
+# Set cores
 N_CORES <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = 2))
 
+##########################################################################################################################
 
-####################################################################################################
-### HELPER FUNCTIONS
-####################################################################################################
+### Helper functions
 
-# 1. Neighbor list: computes all neighbors of each node
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 1: Compute neighbour list
 neighbor_list <- function(g) {
   
-  # This function has the following arguments: 
-  #' @g This is an igraph graph object
-  
+  # This function takes a graph and computes a list of the neighbours of all individuals
+  #' @param g: This is an igraph graph object
+  #' @return list of integers with neighbours
+
   # calculate the neighbors and turn into integer
   lapply(adjacent_vertices(g, V(g), mode = "all"), as.integer)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# 2. S, E, I, R function without birth or death rate (for now)
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 2: S-E-I-R simulation
 seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
   
   # This function simulates an SEIR model using the following arguments: 
-  #' @nbs The precomputed list of neighbors from neighbor_list().
-  #' @start The ID of the node where the outbreak begins.
-  #' @delta The mean duration a node is infectious (in days), for a Poisson distribution.
-  #' @sigma The mean duration a node is in the incubation period (in days), for a Poisson distribution.
-  #' @beta The transmission probability per edge per day.
+  #' @param nbs The precomputed list of neighbors from neighbor_list().
+  #' @param start The ID of the initially infected node (patient zero)
+  #' @param delta The mean duration a node is infectious (in days)
+  #' @param sigma The mean duration a node is latently infected
+  #' @param beta The transmission probability per edge per day.
+  #' @return list with outbreak summary
   
-  ### Initialize vectors
+  ## Step 1: Initialize vectors
   
   # N: Number of individuals
   N <- length(nbs)
@@ -67,7 +82,7 @@ seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
   Tleft <- integer(N)  
   
   # Set the initial state for the 'start' node.
-  # 'i' stands for infectious > exposed individuals cannot infect. 
+  # 2 = I, a.k.a. infectious (exposed individuals cannot infect yet)
   S[start] <- 2L
   
   # Sample a timer from a Poisson distribution with delta as mean
@@ -79,7 +94,6 @@ seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
   removed  <- integer(0)
   
   # Initiate the time step (day) of the simulation
-  #time_step <- 1L
   time_step <- 0L # start at day 0 
   
   # The total infection events (S -> E)
@@ -91,13 +105,14 @@ seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
   removed_per_day <- length(removed)
   
   
-  ### The actual simulation loop
+  ## Step 2: initiate the simulation loop
+
   
   # The simulation continues as long as there are exposed or infectious nodes.
-  # A max of 1000 days is set, but this is a number that is very unlikely to be reached
+  # A max of 1000 days is set as upper limit
   while ((length(infectious) > 0L || length(exposed) > 0L)  && time_step < 1000) {
     
-    ### 1. Transitions: E -> I
+    ## Step 2.1 Transitions: E -> I
     
     # Check if there is anyone in the exposed class
     if (length(exposed) > 0L) {
@@ -125,7 +140,7 @@ seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
       }
     }
     
-    ### 2. Transitions: I -> R
+    ## Step 2.2 Transitions: I -> R
     
     # Check if there is anyone in the infectious class
     if (length(infectious) > 0L) {
@@ -150,15 +165,15 @@ seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
       }
     }
     
-    ### 3. Transitions: S -> E (New Infections)
+    ## Step 2.3 Transitions: S -> E (New Infections)
     
-    # New infections are based on nodes that were Infectious at the start of this step
+    # New infections are based on nodes that were infectious at the start of this step
     if (length(infectious) > 0L) {
       
       # Identify neighbours of infectious individuals
       all_neighbors <- unique(unlist(nbs[infectious]))
       
-      #From that list of neighbors, keep only those who are Susceptible.
+      # From that list of neighbors, keep only those who are Susceptible.
       susceptible_neighbors <- all_neighbors[S[all_neighbors] == 0L]
       
       # only proceed if there's actually a susceptible person nearby.
@@ -195,6 +210,8 @@ seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
     exposed_per_day <- c(exposed_per_day, length(exposed))
     removed_per_day <- c(removed_per_day, length(removed))
   }
+
+  ## Step 3: Return list 
   
   # Return all results, including the daily counts for E, I, R
   return(list(
@@ -205,156 +222,55 @@ seir_discrete <- function(nbs, start, delta = 2L, sigma = 30L, beta) {
     N = N,
     simulation_duration = time_step)) 
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# 3. selecting graph type
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 3: Selecting graphs
 get_graph <- function(graph_type, graph_idx) {
-  
+
+  # This function handles looking up a graph type and id
+  #' @param graph_type: which of five graph types you are looking up
+  #' @param graph_idx: the index of the graph you are looking up
+  #' @return graph 
+
   # Ensure we are dealing with a single string, not a vector
   type_val <- as.character(graph_type[1])
   
-  # 1. Handle Empirical
+  ## Step 1. Handle Empirical
   if (type_val == "empirical") {
     
     # Assuming your lookup has a specific structure for empirical
     return(graph_lookup$empirical$empirical)
   }
   
-  # 2. Handle Synthetic
+  ## Step 2. Handle Synthetic
   if (type_val %in% names(graph_lookup$synthetic)) {
     
-    # Pull the specific instance. Note the [[1]] to ensure we have a single index.
+    # Pull the specific instance. 
+    # If you are uncertain, check the hierarchical listing structure where graphs are stored
     idx_val <- as.integer(graph_idx[1])
     return(igraph::upgrade_graph(graph_lookup$synthetic[[type_val]][[idx_val]][[2]]))  
   }
   
   stop("Unknown graph type: ", type_val)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
 
-################################################################################
-### EXECUTION BLOCK
-################################################################################
-
-
-args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 7) stop("Usage: Rscript script.R <graph_file> <master_seed> <total_tasks> <delta> <sigma> <n_graphs> <n_reps>")
-
-GRAPH_FILE    <- args[1]
-MASTER_SEED   <- as.integer(args[2])
-TOTAL_TASKS   <- as.integer(args[3])
-DELTA_VAL     <- as.numeric(args[4])
-SIGMA_VAL     <- as.numeric(args[5])
-N_GRAPHS      <- as.integer(args[6])
-N_REPS        <- as.integer(args[7])
-
-TASK_ID       <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID", "0"))
-
-
-################################################################################
-### LOAD GRAPHS
-################################################################################
-
-
-# Synthetic
-synthetic_graphs <- readRDS(GRAPH_FILE)
-
-# Empirical
-vetted_graphs <- readRDS(
-  "~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"
-  )
-
-# Combine in list
-graph_lookup <- list(
-  synthetic = synthetic_graphs, 
-  empirical = list(empirical = igraph::upgrade_graph(vetted_graphs$anchor)
-                   )
-  )
-
-# Remove for memory
-rm(vetted_graphs, synthetic_graphs); gc()
-gc()
-
-
-################################################################################
-### BUILD FACTORIAL GRID
-################################################################################
-
-
-# Set beta levels
-beta_levels <- seq(0.01, 0.20, by = 0.005)
-
-# Get graph names
-syn_types <- names(graph_lookup$synthetic)
-
-# Synthetic combinations
-syn_grid <- expand.grid(
-  beta = beta_levels,
-  graph_idx = 1:N_GRAPHS,
-  graph_type = syn_types,
-  replicate = 1:N_REPS,
-  stringsAsFactors = FALSE
-)
-
-# Set emp reps
-EMP_REPS = N_REPS * N_GRAPHS
-
-# Empirical combinations
-emp_grid <- expand.grid(
-  beta = beta_levels,
-  graph_idx = NA_integer_,
-  graph_type = "empirical",
-  replicate = 1:EMP_REPS,
-  stringsAsFactors = FALSE
-)
-
-# Combine
-base_grid <- rbind(syn_grid, emp_grid)
-
-# Global shuffle
-set.seed(MASTER_SEED + 123)
-base_grid <- base_grid[sample(nrow(base_grid)), ]
-
-# Add simulation seeds
-set.seed(MASTER_SEED) 
-base_grid$sim_seed <- sample.int(.Machine$integer.max, 
-                                 size = nrow(base_grid)
-                                 )
-
-# Add variables 
-base_grid$delta <- DELTA_VAL 
-base_grid$sigma <- SIGMA_VAL
-
-
-################################################################################
-### SLURM SLICING
-################################################################################
-
-
-TOTAL_SIMS <- nrow(base_grid) 
-SIMS_PER_TASK <- ceiling(TOTAL_SIMS / TOTAL_TASKS) 
-start_idx <- (TASK_ID * SIMS_PER_TASK) + 1 
-end_idx <- min(start_idx + SIMS_PER_TASK - 1, TOTAL_SIMS) 
-task_grid <- base_grid[start_idx:end_idx, ] 
-
-cat(sprintf( "Task %d running %d simulations\n", TASK_ID, nrow(task_grid) ))
-
-
-################################################################################
-### PARALLELIZATION
-################################################################################
-
-
-future::plan(multisession, workers = N_CORES)
-
-# Run a single simulation
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 4: Run one single simulation 
 run_single_sim <- function(p) {
+
+  # This function runs a single simulation of the SEIR model
+  #' @param p: the task grid 
+  #' @return list with summary output
+
+  ## Step 1: Set-up
   
-  # Get the right graph from the graph file
   # Get the right graph from the graph file
   g <- get_graph(
     graph_type = p$graph_type,
     graph_idx  = p$graph_idx)
-  
   
   # Checks that the graph is a valid igraph object
   if (!is_igraph(g)) {
@@ -376,8 +292,10 @@ run_single_sim <- function(p) {
   # Use seed from grid to set starting node
   set.seed(p$sim_seed)
   start_node <- sample.int(N, 1)
+
+  ## Step 2: Run simulation
   
-  # Run discrete SEIR model
+  # Run one round of the discrete SEIR model
   sim_result <- seir_discrete(
     nbs = nbs,
     start = start_node,
@@ -385,14 +303,16 @@ run_single_sim <- function(p) {
     delta = p$delta,
     sigma = p$sigma)
   
+  ## Step 3: summarize output
+  
   # Calculate daily active cases and deaths
   active_cases_daily <- sim_result$infectious_per_day + sim_result$exposed_per_day
   deaths_daily <- sim_result$removed_per_day
   
-  # Record the total duration of the simulation  (time_step - 1L)
+  # Record the total duration of the simulation 
   duration <- sim_result$simulation_duration
   
-  # Sum of counts across all days (I_counts[1] is Day 0)
+  # Sum of counts across all days 
   sum_I <- sum(sim_result$infectious_per_day)
   sum_E <- sum(sim_result$exposed_per_day)
   sum_R <- sum(sim_result$removed_per_day)
@@ -441,15 +361,142 @@ run_single_sim <- function(p) {
     # Total S-> E events (Total cases)
     total_infections = sim_result$total_infections)
   
-  # Output
-  list(summary = summary)
+  # Return output
+  list(summary = summary,
+       N = sim_result$N)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
 
+##########################################################################################################################
 
-################################################################################
-### RUN SIMULATION
-################################################################################
+
+## Step 1: set-up
+
+# Set script arguments
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) < 7) stop("Usage: Rscript script.R <graph_file> <master_seed> <total_tasks> <delta> <sigma> <n_graphs> <n_reps>")
+
+# Set seven arguments (see SLURM script for details)
+GRAPH_FILE    <- args[1]
+MASTER_SEED   <- as.integer(args[2])
+TOTAL_TASKS   <- as.integer(args[3])
+DELTA_VAL     <- as.numeric(args[4])
+SIGMA_VAL     <- as.numeric(args[5])
+N_GRAPHS      <- as.integer(args[6])
+N_REPS        <- as.integer(args[7])
+
+
+# Obtain task id from system
+TASK_ID       <- as.integer(Sys.getenv("SLURM_ARRAY_TASK_ID", "0"))
+
+
+## Step 2: Load graphs
+
+
+# Synthetic
+synthetic_graphs <- readRDS(GRAPH_FILE)
+
+# Empirical (all are identical)
+vetted_graphs <- readRDS(
+  "~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"
+  )
+
+# Combine in list
+graph_lookup <- list(
+  synthetic = synthetic_graphs, 
+  empirical = list(empirical = igraph::upgrade_graph(vetted_graphs$anchor)
+                   )
+  )
+
+# Remove for memory
+rm(vetted_graphs, synthetic_graphs)
+gc()
+
+
+## Step 3: Build factorial grid
+
+
+# Set beta levels
+beta_levels <- seq(0.01, 0.20, by = 0.005)
+
+# Get graph names
+syn_types <- names(graph_lookup$synthetic)
+
+# Synthetic combinations
+syn_grid <- expand.grid(
+  beta = beta_levels,
+  graph_idx = 1:N_GRAPHS,
+  graph_type = syn_types,
+  replicate = 1:N_REPS,
+  stringsAsFactors = FALSE
+)
+
+# Set empirical repetitions
+EMP_REPS = N_REPS * N_GRAPHS
+
+# Empirical combinations
+emp_grid <- expand.grid(
+  beta = beta_levels,
+  graph_idx = NA_integer_,
+  graph_type = "empirical",
+  replicate = 1:EMP_REPS,
+  stringsAsFactors = FALSE
+)
+
+# Combine
+base_grid <- rbind(syn_grid, emp_grid)
+
+# Global shuffle
+set.seed(MASTER_SEED + 123)
+base_grid <- base_grid[sample(nrow(base_grid)), ]
+
+# Add simulation seeds
+set.seed(MASTER_SEED) 
+base_grid$sim_seed <- sample.int(.Machine$integer.max, 
+                                 size = nrow(base_grid)
+                                 )
+
+# Add the static variables 
+base_grid$delta <- DELTA_VAL 
+base_grid$sigma <- SIGMA_VAL
+
+
+## Step 4: SLURM slicing
+
+
+# Set total number of simulations
+TOTAL_SIMS <- nrow(base_grid) 
+
+# Set total number of simulations per task
+SIMS_PER_TASK <- ceiling(TOTAL_SIMS / TOTAL_TASKS) 
+
+# Set start and end id of task
+start_idx <- (TASK_ID * SIMS_PER_TASK) + 1 
+end_idx <- min(start_idx + SIMS_PER_TASK - 1, TOTAL_SIMS) 
+
+# Create task grid
+task_grid <- base_grid[start_idx:end_idx, ] 
+
+cat(sprintf( "Task %d running %d simulations\n", TASK_ID, nrow(task_grid) ))
+
+
+## Step 5: Parallelization execution
+
+
+# Set up parallelization with n cores
+future::plan(multisession, workers = N_CORES)
+
+# Print number of cores used > check if uses all available cores
+cat(
+  sprintf(
+    "Parallelization enabled using %d cores (future multisession).\n",
+    future::nbrOfWorkers()
+  )
+)
+
+
+## Step 6: Run simulations
 
 
 # Run the single simulation over the whole task grid
@@ -462,9 +509,7 @@ results <- furrr::future_map(
 summary_df <- rbindlist(lapply(results, `[[`, "summary"))
 
 
-################################################################################
-### OUTPUT
-################################################################################
+## Step 7: Save output
 
 
 # Set new directory for output

@@ -1,40 +1,59 @@
 
-# Prerequisites
-file_dir = "/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens"
-locations <- c("Romana", "Sabaneta", "Hepang", "Habi")
-graphs_pattern = "vetted_graphs_task_.*\\.rds"
-summary_pattern = "results_seed_.*\\.csv"
-five_graphs = c("spatial", "sbm", "dcsbm", "ncrg", "random")
+###########################################################################################################################
 
-# Libraries
+# Script by Inez Derkx, contact: inez.derkx@swisstph.ch
+# Created: December 2025; Last edited: September 2026
+# In this script, we select which graphs will be used for downstream modeling 
+
+# IMPORTANT NOTES:
+# 0. The is a standalone script. There is no corresponding .sh script. 
+# 1. This script requires the output of the 06 script. 
+
+# For any issues, feel free to report a new issue on this GitHub repo or contact inez.derkx@swisstph.ch
+
+##########################################################################################################################
+
+### SET UP R ENVIRONMENT ###
+
+# Empty list
+rm(list = ls())
+
+# Load required libraries
+library(igraph)
 library(dplyr)
 library(purrr)
+library(tidyr)
 library(ggplot2)
+library(readr)
 library(data.table)
 
-# Colour palette
-palette_paper <- c("#3A405A", "#FF8465", "#99B2DD", "#FCD2A2", "#A26F39", "#5C8A6F")
+# Set local root directory 
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+setwd(LOCAL_ROOT_DIR)
 
+# Output folders and paths. 
+out_path <- file.path(LOCAL_ROOT_DIR, "Net_Sens")
+ifelse(!dir.exists(file.path(out_path, "Plots")),
+       dir.create(file.path(out_path, "Plots")), FALSE)
 
-#### START ####
+##########################################################################################################################
 
-# Check number of files and if there are missing ones
-for (loc in locations){
-  
-  file_pattern = paste0("*", loc, "*")
-  files <- list.files(path = file.path(file_dir, "Graphs/OtherLocations"), pattern = file_pattern, full.names = TRUE)
-  anyDuplicated(files)
-  print(paste0("Location ", loc, " has ", length(files), " files"))
-}
+### Helper functions
 
-
+#-------------------------------------------------------------------------------------------------------------------------
 # 1. Function to summarize graphs
 summarize_graphs <- function(path,
                              csv_pattern,
                              seed_nr,
                              location){
   
-  
+    # This function creates summaries of all generated graphs from script 06. 
+  #' @param path: path where results df is stored ("results_seed_", base_seed, "_seed_", max_seed, ".csv")
+  #' @param csv_pattern: pattern for file name recognition, e.g. "results_seed_(\\d+)_seed_.*\\.csv" from above.
+  #' @param seed_nr: should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
+  #' @param max_task_id: number of array tasks that will be summarized
+  #' @return A summary dataframe. The function saves and plots this file automatically
+
   # First adapt out path to seed
   csv_path <- file.path(path, "OtherLocations")
   
@@ -92,21 +111,9 @@ summarize_graphs <- function(path,
   return(summary_check)
   
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# Apply function to the four locations
-all_summaries <- locations %>%
-  map_dfr(function(loc) {
-    cat("Processing location:", loc, "...\n")
-    summary <- summarize_graphs(
-      path = file_dir, 
-      csv_pattern = paste0(loc, "_", summary_pattern),
-      seed_nr = 5000,
-      location = loc)
-    return(summary)
-  })
-
-
-
+#-------------------------------------------------------------------------------------------------------------------------
 # 2. Function to select graph matches 
 select_matches <- function(path, 
                            graph_types, 
@@ -117,13 +124,17 @@ select_matches <- function(path,
                            location){
   
   
-  # Function to examine and select graphs for disease modelling:
-  #' @param path
-  #' @param graph_types 
-  #' @param graph_pattern
-  #' @param n_to_keep
-  #' @param mypalette
-  #' @param seed_nr
+  # The main goal of this function is to find the 'n_to_keep' number of files (default = 100) that would best represent
+  # the average degree distribution of a specific graph type based on all 5000 graphs. For more details on this logic, 
+  # read the methods section of the corresponding manuscript. 
+  #' @param path: base path containing folder with graphs 
+  #' @param graph_types string of graph types (e.g. ("spatial", "sbm", "dcsbm", "random", "newclust_graph"))
+  #' @paramgraph_pattern: pattern string (e.g. "vetted_graphs_task_.*\\.rds") for file recognition
+  #' @param n_to_keep: how many graphs to keep for downstream analysis? Default = 100
+  #' @param mypalette: what colour palette are you using for your diagnostics graphs?
+  #' @param seed_nr: should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
+  #' @param max_task_id: number of array tasks that will be summarized
+  #' @return final ensemble of graphs to use for SEIR/SIS simulations
   
   # Starting with location
   cat(paste0("Starting with location: ", location, ".\n"))
@@ -367,37 +378,18 @@ select_matches <- function(path,
   # Return the ensemble file
   return(final_ensemble)
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# Apply function to the four locations
-matches <- locations %>%
-  map_dfr(function(loc) {
-    cat("Processing location:", loc, "...\n")
-    pattern = paste0(loc, "_", graphs_pattern)
-    cat(paste0("Catching graphs with pattern '", pattern, "'\n"))
-    summary <- select_matches(
-      path = file_dir, 
-      graph_types = five_graphs,
-      graph_pattern = pattern,
-      n_to_keep = 100,
-      mypalette = palette_paper,
-      seed_nr = 5000,
-      location = loc)
-    return(summary)
-  })
-
-
+#-------------------------------------------------------------------------------------------------------------------------
 # 3. Function to compute Mahalanobis distance
-mh_distance <- function(path, graph_types, graph_pattern, location){
+mh_distance <- function(path, graph_types, graph_pattern){
   
   #' Compare measure of synthetic networks to empirical network
-  #'
   #' @param path General path to where relevant folders are stored
   #' @param graph_types Character vector of models (e.g., c("ER"))
   #' @param graph_pattern Pattern of files that store the graph
-  #'
   #' @return A summary table ranking models by their proximity to the empirical data
-  
-  
+
   # Helper function: network topology
   get_network_topology <- function(g) {
     if (is.null(g) || !igraph::is_igraph(g)) return(rep(NA, 5))
@@ -502,8 +494,72 @@ mh_distance <- function(path, graph_types, graph_pattern, location){
   return(results)
   cat("\n--- Analysis Complete. ---\n")
 }
+#-------------------------------------------------------------------------------------------------------------------------
 
-# Apply function to the four locations
+##########################################################################################################################
+
+## Step 1: set up for graph examination
+
+# Set file directory 
+file_dir = "/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens"
+
+# Colour palette
+palette_paper <- c("#3A405A", "#FF8465", "#99B2DD", "#FCD2A2", "#A26F39", "#5C8A6F")
+
+# Set locations
+locations <- c("Romana", "Sabaneta", "Hepang", "Habi")
+
+# Set patterns
+graphs_pattern = "vetted_graphs_task_.*\\.rds"
+summary_pattern = "results_seed_.*\\.csv"
+
+# Set graph types
+five_graphs = c("spatial", "sbm", "dcsbm", "ncrg", "random")
+
+
+## Step 2: Examine graphs
+
+
+# Check number of files and if there are missing ones
+for (loc in locations){
+  
+  file_pattern = paste0("*", loc, "*")
+  files <- list.files(path = file.path(file_dir, "Graphs/OtherLocations"), pattern = file_pattern, full.names = TRUE)
+  anyDuplicated(files)
+  print(paste0("Location ", loc, " has ", length(files), " files"))
+}
+
+# Summaries for all four locations
+all_summaries <- locations %>%
+  map_dfr(function(loc) {
+    cat("Processing location:", loc, "...\n")
+    summary <- summarize_graphs(
+      path = file_dir, 
+      csv_pattern = paste0(loc, "_", summary_pattern),
+      seed_nr = 5000,
+      location = loc)
+    return(summary)
+  })
+
+# Find graph matches for all four locations
+matches <- locations %>%
+  map_dfr(function(loc) {
+    cat("Processing location:", loc, "...\n")
+    pattern = paste0(loc, "_", graphs_pattern)
+    cat(paste0("Catching graphs with pattern '", pattern, "'\n"))
+    summary <- select_matches(
+      path = file_dir, 
+      graph_types = five_graphs,
+      graph_pattern = pattern,
+      n_to_keep = 100,
+      mypalette = palette_paper,
+      seed_nr = 5000,
+      location = loc)
+    return(summary)
+  })
+
+
+# Calculate mh distance for all four locations 
 all_distances <- locations %>%
   map_dfr(function(loc) {
     cat("Processing location:", loc, "...\n")
@@ -519,101 +575,5 @@ all_distances <- locations %>%
   })
 
 
-#### DEGREE DISTRIBUTIONS ####
 
-# Open degree distributions of models for both seed numbers
-all_degrees_Habi <- read_csv("Net_Sens/Graphs/OtherLocations/Habi_all_seeds_degree_distributions.csv") %>%
-  mutate(Network = 'Habi')
-all_degrees_Hepang <- read_csv("Net_Sens/Graphs/OtherLocations/Hepang_all_seeds_degree_distributions.csv") %>%
-  mutate(Network = 'Hepang')
-all_degrees_Sabaneta <- read_csv("Net_Sens/Graphs/OtherLocations/Sabaneta_all_seeds_degree_distributions.csv") %>%
-  mutate(Network = 'Sabaneta')
-all_degrees_Romana <- read_csv("Net_Sens/Graphs/OtherLocations/Romana_all_seeds_degree_distributions.csv") %>%
-  mutate(Network = 'Romana')
-
-# Combine 
-all_seeds_degree_distributions <- rbind(all_degrees_Habi, all_degrees_Hepang, all_degrees_Romana, all_degrees_Sabaneta)
-degree_summarized <- all_seeds_degree_distributions %>%
-  group_by(Network, type, degree) %>%
-  summarise(q_25 = quantile(frequency, 0.25, names = FALSE),
-            median = median(frequency),
-            q_75 = quantile(frequency, 0.75, names = FALSE))
-
-# Plot 2: degree distributions per network
-degree_plot <- ggplot(degree_summarized, aes(x = degree, y = median, group = type, color = type, fill = type)) +
-  
-  # Ribbon first, then Line so the line sits on top
-  geom_ribbon(aes(ymin = q_25, ymax = q_75), alpha = 0.2, color = NA) + 
-  geom_line(linewidth = 1) +
-  
-  # Labels
-  labs(
-    y = "Frequency",
-    x = "Degree (\u03BA)",
-    color = "Network Type",
-    fill = "Network Type") +
-  
-  # Scale
-  scale_fill_manual(values = scenario_colors) +
-  scale_color_manual(values = scenario_colors) +
-  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.05))) +
-  scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
-  scale_x_log10() +
-  
-  # Facet
-  facet_wrap(~Network, scales = 'fixed', ncol = 2, axis.labels = "margins") +
-  
-  # Theme
-  theme_bw() +
-  theme(
-    legend.position = "bottom",
-    legend.text = element_text(size = 20),
-    text = element_text(size = 20, family = "sans"),
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 20),
-    axis.text.y = element_text(size = 20),
-    strip.background = element_rect(fill = '#EEEBD3', color = "black"),
-    strip.text = element_text(size = 20),
-    panel.grid.major = element_line(color = "grey90"), # Visible major grid
-    panel.grid.minor = element_blank(),               # Remove distracting minor lines
-    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.8),
-    panel.spacing = unit(1.5, "lines"))
-degree_plot
-out_path <- file.path(LOCAL_ROOT_DIR, "Manuscript")
-plotpath <- file.path(out_path, "Supp_Figure_8_12_03_26.png")
-ggsave(plotpath, degree_plot, width = 12, height = 6)   
-
-
-
-### KS DISTANCES
-
-# Import
-ks_distances_Habi <- read_csv("Net_Sens/Graphs/OtherLocations/Habi_ks_distances_all_sims.csv") %>%
-  mutate(Network = 'Habi')
-ks_distances_Hepang <- read_csv("Net_Sens/Graphs/OtherLocations/Hepang_ks_distances_all_sims.csv") %>%
-  mutate(Network = 'Hepang')
-ks_distances_Sabaneta <- read_csv("Net_Sens/Graphs/OtherLocations/Sabaneta_ks_distances_all_sims.csv") %>%
-  mutate(Network = 'Sabaneta')
-ks_distances_Romana <- read_csv("Net_Sens/Graphs/OtherLocations/Romana_ks_distances_all_sims.csv") %>%
-  mutate(Network = 'Romana')
-
-
-# Combine 
-all_ks_distances <- rbind(ks_distances_Habi, ks_distances_Hepang, ks_distances_Sabaneta, ks_distances_Romana)
-
-# Plot
-ks_summary <- ggplot(all_ks_distances, aes(x = Network, 
-                                           y = ks_dist, 
-                                           fill = graph_type)) +
-  geom_boxplot() +
-  theme_minimal() +
-  scale_fill_manual(values = palette_paper) +
-  labs(title = "Kolmogorov-Smirnov distance distributions per graph type",
-       x = "Graph type",
-       y = "K-S distance",
-       fill = "Seed Total") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "bottom")
-ks_summary
-plotpath <- file.path(file_dir, "Plots/ks_distances_plot_04Feb26.png")
-ggsave(plotpath, ks_summary, width = 10, height = 10) 
-
+### END OF SCRIPT

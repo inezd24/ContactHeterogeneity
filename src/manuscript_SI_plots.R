@@ -1,16 +1,18 @@
-################################################################################
+###########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
-# Created: 10.03.2026
-# Script to plot functions for supplementary info manuscript
+# Created: March 2026; Last edited: September 2026
+# This script creates the exact plots and tables used in the manuscript SI
 
-# Legend of script:
+# Important notes:
+# 1. The images are manually saved by date, e.g. "Figure1_27_05_26.png". If you want, you can automate this for some form
+#    of version control. I prefer doing it manually.
+# 2. The ordering and naming of the graphs is very important here. It appears it may not always be consistent across graphs,
+#    but the result is that all images use the same graph type naming and alphabetical order. Please do not change this. 
+# 3. After saving each plot, the script removes large input files and the plots themselves for efficient memory use. Comment
+#    those script lines if you want to inspect the plots within the environment. 
 
-### IS FOR NEW SECTIONS IN CAPITAL ###
-### Is for headings (e.g., a new function)
-# is for 'small' commands (e.g., rename or merge)
-
-################################################################################
+##########################################################################################################################
 
 
 ### SET UP R ENVIRONMENT ###
@@ -43,8 +45,65 @@ out_path <- file.path(LOCAL_ROOT_DIR, "Manuscript")
 ifelse(!dir.exists(out_path),
        dir.create(out_path), FALSE)
 
-################################################################################
+##########################################################################################################################
 
+### Helper functions
+
+#-------------------------------------------------------------------------------------------------------------------------
+# Helper function 1: find local maxima in outbreak data
+find_outbreak_threshold_sensitive <- function(values, adjust_bw) {
+
+  # This function finds the local maxima in our outbreak data. 
+  # See the 'optimal_bandwidth.R' script for a thorough analysis
+  #' @param 'values'
+  #' @param 'adjust_bw': value to adjust bandwidth for sensitivity
+  
+  # 1. Basic cleaning
+  values <- na.omit(values)
+  if(length(unique(values)) < 5) return(0.05)
+  
+  # 2. Set sensitivity using a small 'adjust' value
+  dens <- density(values, adjust = adjust_bw, from = 0, to = 1)
+  
+  # 3. Find peaks (local maxima)
+  #    A point is a peak if it's higher than its two neighbors
+  is_peak <- diff(sign(diff(dens$y))) == -2
+  peaks <- which(is_peak) + 1
+  
+  # 4. Filter peaks: Ignore tiny "wiggles" by requiring peaks to be a certain 
+  #    percentage of the maximum density height
+  significant_peaks <- peaks[dens$y[peaks] > (max(dens$y) * 0.02)]
+  
+  if(length(significant_peaks) >= 2) {
+    # The valley is the lowest point between the FIRST peak and the LAST peak
+    first_p <- significant_peaks[1]
+    last_p  <- significant_peaks[length(significant_peaks)]
+    
+    # Slice the density to only the area between peaks
+    between_y <- dens$y[first_p:last_p]
+    valley_idx <- which.min(between_y) + first_p - 1
+    threshold  <- dens$x[valley_idx]
+    if (!exists("threshold")) cat("Threshold not calculate. Revert to quantile-based threshold.\n")
+    if (exists("threshold")) cat("Threshold calculated.\n")
+    
+  } else {
+    # If bimodal logic fails (common at very low or very high beta), we use a quantile-based fallback. 
+    # For bimodal epidemic data, the 10th percentile is often a safe 'floor' for major outbreaks 
+    # NOTE: this is only suitable if the distribution is wide.
+    if(max(values) > 0.1) {
+      threshold <- 0.05 # A standard "5% prevalence" definition for epidemic establishment
+    } else {
+      threshold <- 1.0 # Everything is minor if the max is tiny
+    }
+  }
+  
+  return(threshold)
+}
+#-------------------------------------------------------------------------------------------------------------------------
+
+##########################################################################################################################
+
+### ALL MANUSCRIPT SI IMAGES
 
 # Colour palette 1
 scenario_colors <- c(
@@ -62,9 +121,10 @@ seed_colors <- c(
   "2000"    = "#52796F",
   "5000"    = "#354F52")
 
-# ------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 1  ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: six graph parameters by graph type and seed
 
@@ -148,9 +208,9 @@ plotpath <- file.path(out_path, "Supp_Figure_1_27_05_26.png")
 ggsave(plotpath, summary_plot_seed, width = 14, height = 14)           
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 2  ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: running mean of betweenness and degree
 
@@ -204,9 +264,9 @@ plotpath <- file.path(out_path, "Supp_Figure_2_27_05_26.png")
 ggsave(plotpath, running_mean_plot, width = 14, height = 10)      
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 3 ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: Kolmogorov-Smirnov distances by graph type and seed
 
@@ -259,9 +319,9 @@ plotpath <- file.path(out_path, "Supp_Figure_3_27_05_26.png")
 ggsave(plotpath, ks_summary, width = 10, height = 10)    
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 4 ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Load data
 MASTER_ENSEMBLE_FOR_DM <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds")
@@ -334,9 +394,9 @@ plotpath <- file.path(out_path, "Supp_Figure_4_27_05_26.png")
 ggsave(plotpath, between_plot, width = 14, height = 10)
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 5  ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: Remainder of SIS delta values (4 to 8)
 
@@ -428,9 +488,9 @@ plotpath <- file.path(out_path, "Supp_Figure_5_27_05_26.png")
 ggsave(plotpath, SIS_cases_plot, width = 16, height = 16) 
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 6 ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: factorial sampling of SIS and SEIR graphs
 
@@ -607,9 +667,9 @@ plotpath <- file.path(out_path, "Supp_Figure_6_27_05_26.png")
 ggsave(plotpath, cases_plot, width = 12, height = 16)   
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 7 ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: factorial sampling outbreak types
 
@@ -627,54 +687,6 @@ size_and_duration <-read_csv("Outfiles/Factorial_Summary_SEIR_23400000_mseed_100
   rename_with(~c("duration"), c(duration_days))
 size_and_duration$Graph <- factor(size_and_duration$Graph, 
                                   levels = c("DCSBM", "Empirical", "ERM",'NCRG', 'SBM', "SENCA"))
-
-# Function to find local maxima in outbreak data
-find_outbreak_threshold_sensitive <- function(values, adjust_bw) {
-  
-  # 1. Basic cleaning
-  values <- na.omit(values)
-  if(length(unique(values)) < 5) return(0.05)
-  
-  # 2. Force high sensitivity using a small 'adjust' value.
-  # adjust = 0.3 makes the density function much more sensitive to dips (the valley).
-  # We use 'from' and 'to' to ensure we capture the 0-1 range of population fraction.
-  dens <- density(values, adjust = adjust_bw, from = 0, to = 1)
-  
-  # 3. Find peaks (local maxima)
-  # A point is a peak if it's higher than its two neighbors
-  is_peak <- diff(sign(diff(dens$y))) == -2
-  peaks <- which(is_peak) + 1
-  
-  # 4. Filter peaks: Ignore tiny "wiggles" by requiring peaks to be a certain 
-  # percentage of the maximum density height
-  significant_peaks <- peaks[dens$y[peaks] > (max(dens$y) * 0.02)]
-  
-  if(length(significant_peaks) >= 2) {
-    # Logic: The valley is the lowest point between the FIRST peak and the LAST peak
-    first_p <- significant_peaks[1]
-    last_p  <- significant_peaks[length(significant_peaks)]
-    
-    # Slice the density to just the area between peaks
-    between_y <- dens$y[first_p:last_p]
-    valley_idx <- which.min(between_y) + first_p - 1
-    threshold  <- dens$x[valley_idx]
-    if (!exists("threshold")) cat("Threshold not calculate. Revert to quantile-based threshold.\n")
-    if (exists("threshold")) cat("Threshold calculated.\n")
-    
-  } else {
-    # FALLBACK: If bimodal logic fails (common at very low or very high beta)
-    # We use a quantile-based fallback. For bimodal epidemic data, 
-    # the 10th percentile is often a safe 'floor' for major outbreaks 
-    # IF the distribution is wide.
-    if(max(values) > 0.1) {
-      threshold <- 0.05 # A standard "5% prevalence" definition for epidemic establishment
-    } else {
-      threshold <- 1.0 # Everything is minor if the max is tiny
-    }
-  }
-  
-  return(threshold)
-}
 
 # Apply to your data table by group
 setDT(size_and_duration)
@@ -732,9 +744,9 @@ plotpath <- file.path(out_path, "Supp_Figure_7_27_05_26.png")
 ggsave(plotpath, comparison_plot, width = 18, height = 12)  
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 8  ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: Factorial sampling SIS remaining deltas (4 to 8)
 
@@ -836,9 +848,9 @@ plotpath <- file.path(out_path, "Supp_Figure_8_27_05_26.png")
 ggsave(plotpath, SIS_cases_plot, width = 16, height = 16) 
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 9  ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: outbreak type for SEIR randomized
 
@@ -888,9 +900,9 @@ plotpath <- file.path(out_path, "Supp_Figure_9_27_05_26.png")
 ggsave(plotpath, outbreak_type_plot, width = 16, height = 8)
 
 
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 11 ----
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: Graph examples for all graph types and four locations
 
@@ -990,9 +1002,9 @@ plotpath <- file.path(out_path, "Supp_Figure_11_27_05_26.png")
 ggsave(plotpath, graphs, width = 20, height = 16) 
 
 
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 12 ----
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: Graph parameters for all 4 locations and models
 
@@ -1084,9 +1096,9 @@ plotpath <- file.path(out_path, "Supp_Figure_12_27_05_26.png")
 ggsave(plotpath, combined_summary_plot, width = 20, height = 24)   
 
 
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 13 ----
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 # Topic: degree distributions for all four locations
 
@@ -1193,9 +1205,10 @@ plotpath <- file.path(out_path, "Supp_Figure_13_27_05_26.png")
 ggsave(plotpath, degree_plot, width = 12, height = 6)  
 
 
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY FIGURE 14 ----
-# -------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
+
 
 # Topic: KS distances for all graph types and four locations
 
@@ -1256,12 +1269,13 @@ plotpath <- file.path(out_path, "Supp_Figure_14_27_05_26.png")
 ggsave(plotpath, ks_summary, width = 12, height = 6)  
 
 
-############################### TABLES ---- ####################################
+##########################################################################################################################
 
+### ALL MANUSCRIPT SI TABLES
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY TABLE 1  ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 files <- list.files(
   path = "Net_Sens", 
@@ -1295,9 +1309,9 @@ convergence_summary <- summary_checks_no_opt %>%
     precision_gain = (1 - (se / lag(se))) * 100)
 
 
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 ## SUPPLEMENTARY TABLE 3  ----
-# ------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------------------------------------
 
 size_and_duration <- read_csv("Outfiles/Randomized_Summary_SEIR_3000000_mseed_100_01June26.csv") %>%
   #filter(total_infections > 0) %>%
@@ -1312,53 +1326,6 @@ size_and_duration <- read_csv("Outfiles/Randomized_Summary_SEIR_3000000_mseed_10
   rename_with(~c("duration"), c(duration_days))
 size_and_duration$Graph <- factor(size_and_duration$Graph, 
                                   levels = c("DCSBM", "Empirical", "ERM", 'NCRG', 'SBM', "SENCA"))
-# Function to find local maxima in outbreak data
-find_outbreak_threshold_sensitive <- function(values, adjust_bw) {
-  
-  # 1. Basic cleaning
-  values <- na.omit(values)
-  if(length(unique(values)) < 5) return(0.05)
-  
-  # 2. Force high sensitivity using a small 'adjust' value.
-  # adjust = 0.3 makes the density function much more sensitive to dips (the valley).
-  # We use 'from' and 'to' to ensure we capture the 0-1 range of population fraction.
-  dens <- density(values, adjust = adjust_bw, from = 0, to = 1)
-  
-  # 3. Find peaks (local maxima)
-  # A point is a peak if it's higher than its two neighbors
-  is_peak <- diff(sign(diff(dens$y))) == -2
-  peaks <- which(is_peak) + 1
-  
-  # 4. Filter peaks: Ignore tiny "wiggles" by requiring peaks to be a certain 
-  # percentage of the maximum density height
-  significant_peaks <- peaks[dens$y[peaks] > (max(dens$y) * 0.02)]
-  
-  if(length(significant_peaks) >= 2) {
-    # Logic: The valley is the lowest point between the FIRST peak and the LAST peak
-    first_p <- significant_peaks[1]
-    last_p  <- significant_peaks[length(significant_peaks)]
-    
-    # Slice the density to just the area between peaks
-    between_y <- dens$y[first_p:last_p]
-    valley_idx <- which.min(between_y) + first_p - 1
-    threshold  <- dens$x[valley_idx]
-    if (!exists("threshold")) cat("Threshold not calculate. Revert to quantile-based threshold.\n")
-    if (exists("threshold")) cat("Threshold calculated.\n")
-    
-  } else {
-    # FALLBACK: If bimodal logic fails (common at very low or very high beta)
-    # We use a quantile-based fallback. For bimodal epidemic data, 
-    # the 10th percentile is often a safe 'floor' for major outbreaks 
-    # IF the distribution is wide.
-    if(max(values) > 0.1) {
-      threshold <- 0.05 # A standard "5% prevalence" definition for epidemic establishment
-    } else {
-      threshold <- 1.0 # Everything is minor if the max is tiny
-    }
-  }
-  
-  return(threshold)
-}
 
 # Apply to your data table by group
 setDT(size_and_duration)
@@ -1385,3 +1352,6 @@ supp_table3 <- size_and_duration %>%
             median_time = median(duration),
             sd_time = sd(duration),
             max_time = max(duration))
+
+
+### END OF SCRIPT

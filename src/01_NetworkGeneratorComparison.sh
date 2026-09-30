@@ -1,20 +1,23 @@
 #!/bin/bash
 #SBATCH --job-name=00_NetworkGeneration
-#SBATCH --output="/scicore/home/chitnis/derkx0000/GraphComparison/SLURM/00/%x.%A_%a.out"
-#SBATCH --error="/scicore/home/chitnis/derkx0000/GraphComparison/SLURM/00/%x.%A_%a.err"
+#SBATCH --output="/path/%x.%A_%a.out"
+#SBATCH --error="/path/%x.%A_%a.err"
 #SBATCH --array=1-5000%100         # This creates 100 simultaneous tasks in an array of 5000
 #SBATCH --cpus-per-task=1          # Each task is single-threaded
 #SBATCH --mem=8G                   # Adjust based on your N_nodes
 #SBATCH --time=06:00:00            # Adjust based on grid_optimization size
 
-# Load R module (name depends on your cluster, e.g., R/4.2.0)
+### MODULES
+
 ml purge
-ml R/4.2.1-foss-2022a # Load R version 4.2.1
+ml R/4.2.1-foss-2022a # Adapt to your cluster's R version
 
 # Set task id and script
 OFFSET=${OFFSET:-0}
 ACTUAL_ID=$((SLURM_ARRAY_TASK_ID + OFFSET))
 R_SCRIPT="01_NetworkGeneratorComparison.R"
+
+### RUN
 
 echo "Processing Task ID: $ACTUAL_ID"
 

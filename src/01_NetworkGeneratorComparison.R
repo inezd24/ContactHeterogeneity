@@ -1,4 +1,4 @@
-###########################################################################################################################
+##########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
 # Created: December 2025; Last edited: September 2026
@@ -57,10 +57,14 @@ out_path_graphs <- file.path(out_path, "Graphs")
 
 ##########################################################################################################################
 
-## 0. Load all helper functions (1-9)
+### Load all helper functions (1-9)
 
 # All functions are stored in this R script and corresponding .Rdata file: "HelperFunctions.RData"
 source("00_constructNetworkFunctions.R")
+
+##########################################################################################################################
+
+### Execute code
 
 ## 1. Get the task_id and seed from SLURM environment
 args <- commandArgs(trailingOnly = TRUE)
@@ -90,7 +94,7 @@ total_graphs_list <- list()
 for (r in 1:5) {
   
   # Generate the five networks
-  results_from_func <- construct_five_networks(
+  results_from_func <- construct_four_networks(
     empirical_edgelist = ServerData$dog_contact_zone_1,
     kappa_grid = seq(28, 30, by = 1),  # adapt kappa grid as needed
     tau_grid = seq(0.5, 0.95, by = 0.05), # adapt tau grid as needed
@@ -152,7 +156,7 @@ if (length(replicate_results) > 0) {
 } else {
   
   # Report if no results generated
-  cat("\nError: No results were generated. Check construct_five_networks logic.\n")
+  cat("\nError: No results were generated. Check construct_four_networks logic.\n")
 }
 
 

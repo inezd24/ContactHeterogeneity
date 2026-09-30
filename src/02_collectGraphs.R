@@ -2,7 +2,7 @@
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
 # Created: December 2025; Last edited: September 2026
-# In this script, we create an empirical and various synthetic networks using network generator algorithms. 
+# In this script, we select which graphs will be used for downstream modeling. 
 
 # IMPORTANT NOTES:
 # 0. The is a standalone script. There is no corresponding .sh script. 
@@ -47,11 +47,11 @@ summarize_graphs <- function(path,
                              max_task_id = NULL){
 
   # This function creates summaries of all generated graphs from script 01. 
-  #' @param: 'path': path where results df is stored ("results_seed_", base_seed, "_seed_", max_seed, ".csv")
-  #' @param: 'csv_pattern': pattern for file name recognition, e.g. "results_seed_(\\d+)_seed_.*\\.csv" from above.
-  #' @param: 'seed_nr': should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
-  #' @param: 'max_task_id': number of array tasks that will be summarized
-  #' @return: A summary dataframe. The function saves and plots this file automatically
+  #' @param path: path where results df is stored ("results_seed_", base_seed, "_seed_", max_seed, ".csv")
+  #' @param csv_pattern: pattern for file name recognition, e.g. "results_seed_(\\d+)_seed_.*\\.csv" from above.
+  #' @param seed_nr: should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
+  #' @param max_task_id: number of array tasks that will be summarized
+  #' @return A summary dataframe. The function saves and plots this file automatically
 
   ## Step 1: Source and gather files
 
@@ -158,14 +158,14 @@ select_matches <- function(path,
   # The main goal of this function is to find the 'n_to_keep' number of files (default = 100) that would best represent
   # the average degree distribution of a specific graph type based on all 5000 graphs. For more details on this logic, 
   # read the methods section of the corresponding manuscript. 
-  #' @param 'path': base path containing folder with graphs 
-  #' @param 'graph_types': string of graph types (e.g. ("spatial", "sbm", "dcsbm", "random", "newclust_graph"))
-  #' @param 'graph_pattern' : pattern string (e.g. "vetted_graphs_task_.*\\.rds") for file recognition
-  #' @param 'n_to_keep': how many graphs to keep for downstream analysis? Default = 100
-  #' @param 'mypalette': what colour palette are you using for your diagnostics graphs?
-  #' @param: 'seed_nr': should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
-  #' @param: 'max_task_id': number of array tasks that will be summarized
-  #' @return: final ensemble of graphs to use for SEIR/SIS simulations
+  #' @param path: base path containing folder with graphs 
+  #' @param graph_types string of graph types (e.g. ("spatial", "sbm", "dcsbm", "random", "newclust_graph"))
+  #' @paramgraph_pattern: pattern string (e.g. "vetted_graphs_task_.*\\.rds") for file recognition
+  #' @param n_to_keep: how many graphs to keep for downstream analysis? Default = 100
+  #' @param mypalette: what colour palette are you using for your diagnostics graphs?
+  #' @param seed_nr: should correspond to the number in path ("_seed_") for file recognition, aka total array size. 
+  #' @param max_task_id: number of array tasks that will be summarized
+  #' @return final ensemble of graphs to use for SEIR/SIS simulations
 
   ## Step 1: Set paths
 
@@ -493,11 +493,9 @@ select_matches <- function(path,
 mh_distance <- function(path, graph_types, graph_pattern){
   
   #' Compare measure of synthetic networks to empirical network
-  #'
   #' @param path General path to where relevant folders are stored
   #' @param graph_types Character vector of models (e.g., c("ER"))
   #' @param graph_pattern Pattern of files that store the graph
-  #'
   #' @return A summary table ranking models by their proximity to the empirical data
   
   
@@ -608,8 +606,11 @@ mh_distance <- function(path, graph_types, graph_pattern){
 
 ##########################################################################################################################
 
+### Select graphs
 
-### Apply functions
+
+## Step 1: set up for graph examination
+
 
 # Colour palette
 palette_paper <- c("#3A405A", "#FF8465", "#99B2DD", "#FCD2A2", "#A26F39", "#5C8A6F")
@@ -621,7 +622,9 @@ summary_pattern = "results_seed_(\\d+)_seed_.*\\.csv"
 # Set graph types
 five_graphs = c("spatial", "sbm", "dcsbm", "random", "newclust_graph")
 
-#--------------------------------- Seed 100 ------------------------------------
+
+## Step 2: examine first 100 graphs
+
 
 # Summary
 summary_check_100 <- summarize_graphs(path = out_path,
@@ -641,7 +644,9 @@ matches_seed100 <- select_matches(path = out_path,
                                   seed_nr = 5000,
                                   max_task_id = 100)
 
-#-------------------------------- Seed 1000 ------------------------------------
+
+## Step 3: examine first 1000 graphs
+
 
 # Summary
 summary_check_1000 <- summarize_graphs(path = out_path,
@@ -661,7 +666,8 @@ matches_seed1000 <- select_matches(path = out_path,
                                    max_task_id = 1000)
 
 
-#-------------------------------- Seed 2000 ------------------------------------
+## Step 4: examine first 2000 graphs
+
 
 # Summary
 summary_check_2000 <- summarize_graphs(path = out_path,
@@ -680,6 +686,10 @@ matches_seed2000 <- select_matches(path = out_path,
                                    mypalette = palette_paper,
                                    seed_nr = 5000,
                                    max_task_id = 2000)
+
+
+## Step 5: examine first 5000 graphs
+
 
 # Seed 5000
 summary_check_5000 <- summarize_graphs(path = out_path,
@@ -701,99 +711,7 @@ mahala_dist5000 <- mh_distance(path = graph_path,
                                graph_types = five_graphs,
                                graph_pattern = graphs_pattern)
 write.csv(mahala_dist5000, "Net_Sens/Seed_5000/mahala_dist5000", row.names=F)
-           
 
-
-# Open degree distributions of models for both seed numbers
-all_seeds_degree_distributions_100 <- read_csv("Net_Sens/Graphs/Seed_100/all_seeds_degree_distributions.csv") %>%
-  mutate(Seed_run = '100_seeds')
-all_seeds_degree_distributions_1000 <- read_csv("Net_Sens/Graphs/Seed_1000/all_seeds_degree_distributions.csv") %>%
-  mutate(Seed_run = '1000_seeds')
-all_seeds_degree_distributions_2000 <- read_csv("Net_Sens/Graphs/Seed_2000/all_seeds_degree_distributions.csv") %>%
-  mutate(Seed_run = '2000_seeds')
-all_seeds_degree_distributions_5000 <- read_csv("Net_Sens/Graphs/Seed_5000/all_seeds_degree_distributions.csv") %>%
-  mutate(Seed_run = '5000_seeds')
-
-
-
-### Statistically examine stochastic variance
-
-## Degree
-
-# Create data for running mean
-plot_data <- summary_check_no_opt %>%
-  filter(Params == "Avg_Degree" | Params == 'Avg_Betweenness') %>%
-  filter(Graph != 'empirical_graph') %>%
-  select(-(Replicate)) %>%
-  group_by(Graph, SeedTotal, Params) %>%
-  arrange(Seed) %>%
-  mutate(n = row_number()) %>%
-  
-  # Calculate cumulative statistics
-  mutate(
-    running_mean = cumsum(Values) / n,
-    running_var = (cumsum(Values^2) / n) - (running_mean^2),
-    running_sd = sqrt(pmax(running_var, 0)),
-    running_se = running_sd / sqrt(n),
-    ci_lower = running_mean - (1.96 * running_se),
-    ci_upper = running_mean + (1.96 * running_se)) %>%
-  ungroup()
-
-# Plot running mean
-running_mean_plot <- ggplot(plot_data, aes(x = n, y = running_mean, color = factor(SeedTotal), fill = factor(SeedTotal))) +
-  geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper), alpha = 0.2, color = NA) +
-  geom_line(size = 0.7) +
-  facet_grid(Params~Graph, scales = "free") +
-  labs(
-    title = "Convergence of average degree and betweenness by graph type",
-    subtitle = "Comparing stability between 100, 1,000 and 2,000 total seeds",
-    x = "Number of Seeds Sampled (n)",
-    y = "Cumulative average degree",
-    fill = "Total Seeds",
-    color = "Total Seeds") +
-  theme_bw() +
-  scale_fill_manual(values = palette_paper) +
-  scale_color_manual(values = palette_paper) +
-  theme(text = element_text(size = 15),
-        legend.position = 'bottom')
-plotpath <- file.path(out_path, "Plots/running_mean_plot_21Jan26.png")
-ggsave(plotpath, running_mean_plot, width = 10, height = 10)              
-
-# Statistical convergence table
-convergence_summary <- summary_check_no_opt %>%
-  filter(Params %in% c("Avg_Degree", "Avg_Betweenness")) %>%
-  filter(Graph != "empirical_graph") %>%
-  group_by(Graph, Params, SeedTotal) %>%
-  summarise(
-    mean_val = mean(Values),
-    se       = sd(Values) / sqrt(n()),
-    rse_pct  = (se / mean_val) * 100,
-    ci_width = 1.96 * se,
-    .groups  = "drop") %>%
-  
-  # Sort to ensure the lag() function calculates the diff between the right rows
-  arrange(Graph, Params, SeedTotal) %>%
-  group_by(Graph, Params) %>%
-  mutate(
-    mean_drift_pct = (abs(mean_val - lag(mean_val)) / lag(mean_val)) * 100,
-    precision_gain = (1 - (se / lag(se))) * 100)
-
-
-## Check spatial graph convergence
-spatial_params <- summary_check %>%
-  filter(Graph == "spatial_graph") %>%
-  filter(Params == 'Opt_Kappa' | Params == 'Opt_Lambda' | Params == 'Opt_Tau') %>%
-  select(SeedTotal, Params, Values) %>%
-  ggplot(aes(x = Values, fill = factor(SeedTotal), color = factor(SeedTotal))) +
-  geom_density(alpha = 0.3) +
-  facet_wrap(~Params, scales = "free") +
-  theme_minimal() +
-  labs(title = "Shift in 'Optimal' Parameters across Seed Totals",
-       subtitle = "Does the optimizer find different values with more trials?",
-       x = "Parameter Value",
-       y = "Density",
-       fill = "Total Seeds") +
-  theme(legend.position = "bottom")
 
 
 ### End of script ###

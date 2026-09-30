@@ -1,5 +1,4 @@
-###########################################################################################################################
-
+##########################################################################################################################
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
 # Created: May 2026; Last edited: September 2026
 # This script serves as an addendum for script 01. It constructs the NCRG separately and adds the graphs to the original
@@ -52,8 +51,8 @@ calculate_joint_degree_sequence <- function(graph) {
 
   # This function calculates the joint degree sequence of a given graph,
   # with edge degree and triangle degree
-  #' @param: 'graph': an igraph graph object
-  #' @return: a list dataframe with nr of nodes, triangle count and independent-stub count
+  #' @param graph: an igraph graph object
+  #' @return a list dataframe with nr of nodes, triangle count and independent-stub count
 
   # Vertex count
   N <- vcount(graph)
@@ -103,10 +102,10 @@ random_clustered_graph <- function(joint_degree_sequence,
                                    seed = NULL) {
 
   # This function creates an NCRG from the joint degree sequence 
-  #' @param: 'joint_degree_sequence': output from helper function 1
-  #' @param: 'simplify_graph': whether to simplify or not. Default = TRUE
-  #' @param: 'seed': whether a seed is used or not. Default = NULL. 
-  #' @return: an igraph graph object  
+  #' @param joint_degree_sequence: output from helper function 1
+  #' @param simplify_graph: whether to simplify or not. Default = TRUE
+  #' @param seed: whether a seed is used or not. Default = NULL. 
+  #' @return an igraph graph object  
   
   # Set optional seed
   if (!is.null(seed)) set.seed(seed)
@@ -203,8 +202,8 @@ diagnose_newman_fit <- function(graph, jds = NULL) {
 
    # This checks whether the NCRG is a good representation of the empirical network. This
    # function is purely there to examine the Newman fit, not to generate files. 
-  #' @param: 'graph': NCRG from helper function 2
-  #' @param: 'jds': joint degree sequence of graph (helper function 1)
+  #' @param graph: NCRG from helper function 2
+  #' @param jds: joint degree sequence of graph (helper function 1)
 
   # Check if JDS is included. Else, calculate
   if (is.null(jds)) jds <- calculate_joint_degree_sequence(graph)

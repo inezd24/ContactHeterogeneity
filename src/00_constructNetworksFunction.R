@@ -1,10 +1,10 @@
-###########################################################################################################################
+##########################################################################################################################
 
 # Script by Inez Derkx, contact: inez.derkx@swisstph.ch
 # Created: December 2025; Last edited: September 2026
 # This script acts as a repository for helper function used throughout analyses. In their current form, the remaining 
-# scripts do not use 'source()' to call these functions, but call them locally. You may adapt this as desired. Please note
-# that the functions are well described here, but not elsewhere.
+# scripts do not use 'source()' to call these functions, but call them locally. You may adapt this as desired. Please 
+# note that the functions are well described here, but not elsewhere.
 
 ##########################################################################################################################
 
@@ -36,7 +36,8 @@ empirical_net <- function(df){
   # Function generates a simple network from a dataframe with variables 'dog' and 'peer' as edgelist components
   # It does not care whether interactions are weighted, repeated, or else, as it will turn the edgelist into 
   # an undirected, unweighted graph. 
-  #' @param: 'df': dataframe that can be used as edgelist and has the columns 'dog' and 'peer'. 
+  #' @param df: dataframe that can be used as edgelist and has the columns 'dog' and 'peer'. 
+  #' @return list of graph and parameters
   # Necessary packages: igraph
   
   cat("\nStarting with construction of empirical graph.\n")
@@ -79,7 +80,7 @@ empirical_net <- function(df){
 calculate_degree_distribution <- function(graph) {
   
   # Function returns a dataframe with empirical degree PMF
-  #' @param: 'graph': any igraph grpah object. If you use a different graph 
+  #' @param graph: any igraph grpah object. If you use a different graph 
   # type, make sure to convert it to an igraph object. 
   # Necessary packages: igraph
 
@@ -103,8 +104,8 @@ ks_distance <- function(synthetic_degrees, empirical_degrees) {
 
   # Function calculates the Kolmogorov-Smirnov distance between two 
   # degree distributions
-  #' @param: 'synthetic_degrees': degree distribution of other graph
-  #' @param: 'empirical_degrees': degree distribution of reference graph
+  #' @param synthetic_degrees: degree distribution of other graph
+  #' @param empirical_degrees: degree distribution of reference graph
   # Necessary packages: igraph, stats (for ecdf)
   
   # Convert degrees to ECDFs (Empirical Cumulative Distribution Function)
@@ -128,8 +129,8 @@ chi2_distance <- function(synth_df, emp_df) {
 
   # Function calculates the Chi-Squared (χ²) distance between two 
   # degree distributions. Requires output from helper function 2. 
-  #' @param: 'synth_df': df of degrees and probability of other graph
-  #' @param: 'emp_df': df of degrees and probability of reference graph
+  #' @param synth_df: df of degrees and probability of other graph
+  #' @param emp_df: df of degrees and probability of reference graph
   # Necessary packages: /
   
   # Standardize column names
@@ -299,7 +300,7 @@ grid_optimization <- function(empirical_net,
   # This function performs grid optimization for the kappa, tau, and lambda parameters,
   # given a certain parameter range for each parameter and a certain square size. 
   # This function is also fully adapted from Laager et al. (2018)'s python code. 
-  #' @param: 'empirical_net': the empirical network as an igraph object
+  #' @param empirical_net: the empirical network as an igraph object
   #' @param: 'kappa_grid': parameter range for kappa
   #' @param: 'tau_grid': parameter range for tau
   #' @param: 'lambda_grid': parameter range for lambda
@@ -428,11 +429,11 @@ generate_sbm_graph <- function(num_nodes,
 
   # Function generates a network using a stochastic block model
   # This function already requires you to know c and B for a given empirical network
-  #' @param: 'num_nodes': number of nodes (of your empirical graph)
-  #' @param: 'c': block membership
-  #' @param: 'B': block probability matrix 
-  #' @param: 'seed': optional seed
-  #' @return: an igraph object ('g_sim')
+  #' @param num_nodes: number of nodes (of your empirical graph)
+  #' @param c: block membership
+  #' @param B: block probability matrix 
+  #' @param seed: optional seed
+  #' @return an igraph object ('g_sim')
   
   # Set optional seed (per function argument)
   if (!is.null(seed)) set.seed(seed)
@@ -472,10 +473,10 @@ generate_dcsbm_graph <- function(num_nodes,
 
   # Function generates a network using a degree-corrected stochastic block model
   # This function already requires you to know Phat for a given empirical network
-  #' @param: 'num_nodes': number of nodes (of your empirical graph)
-  #' @param: 'Phat': edge probability matrix
-  #' @param: 'seed': optional seed
-  #' @return: an igraph object ('g_sim')
+  #' @param num_nodes: number of nodes (of your empirical graph)
+  #' @param Phat: edge probability matrix
+  #' @param seed: optional seed
+  #' @return an igraph object ('g_sim')
   
   # Force a seed
   if (!is.null(seed)) set.seed(seed)
@@ -508,7 +509,7 @@ generate_dcsbm_graph <- function(num_nodes,
 
 #-------------------------------------------------------------------------------------------------------------------------
 # 9. Pipeline to construct all networks
-construct_five_networks <- function(empirical_edgelist, 
+construct_four_networks <- function(empirical_edgelist, 
                                     square_edge_size = 1,
                                     kappa_grid, 
                                     tau_grid, 
@@ -517,14 +518,14 @@ construct_five_networks <- function(empirical_edgelist,
                                     base_seed){
 
   # This function relies on all previous helper functions to fulfill network construction
-  #' @param: 'empirical_edgelist': an edgelist as detailed in helper function 1
-  #' @param: 'square_edge_size': edge size for grid. Default = 1
-  #' @param: 'kappa_grid': parameter range for kappa
-  #' @param: 'tau_grid': parameter range for tau
-  #' @param: 'lambda_grid': parameter range for lambda
-  #' @param: 'K_max': maximum K for BIC
-  #' @param: 'base_seed': seed for reproducibility
-  #' @return: list of lists with graphs, optimal SENCA parameters and SBM/DCSBM communities
+  #' @param empirical_edgelist: an edgelist as detailed in helper function 1
+  #' @param square_edge_size: edge size for grid. Default = 1
+  #' @param kappa_grid: parameter range for kappa
+  #' @param tau_grid: parameter range for tau
+  #' @param lambda_grid: parameter range for lambda
+  #' @param K_max: maximum K for BIC
+  #' @param base_seed: seed for reproducibility
+  #' @return list of lists with graphs, optimal SENCA parameters and SBM/DCSBM communities
   
 
   ## Step 1: Create empirical network from edgelist
@@ -681,7 +682,7 @@ construct_five_networks <- function(empirical_edgelist,
     stop("\nError: random graph not constructed. Aborting process...\n")
   }
 
-  ## Step 5: list and return results 
+  ## Step 4: list and return results 
   
   # Create list of graphs, including empirical graph
   graph_list <- list(empirical_graph = empirical_graph, 
