@@ -388,7 +388,7 @@ construct_five_networks <- function(empirical_edgelist,
 #-------------------------------------------------------------------------------------------------------------------------
 
 # Source 00 and 01a scripts for remaining helper functions
-source("00_constructNetworkFunctions.R")
+source("00_constructNetworkFunction.R")
 source("01a_Run_NCRG.R")
 
 ##########################################################################################################################
