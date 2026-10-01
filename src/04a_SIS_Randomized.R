@@ -33,7 +33,7 @@ suppressPackageStartupMessages({
 })
 
 # Set local root directory where the simulation folders reside.
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication"
 setwd(LOCAL_ROOT_DIR)
 
 # Set cores
@@ -344,7 +344,7 @@ cat("Task:", TASK_ID, "; Master seed:", MASTER_SEED, "\n")
 synthetic_graphs <- readRDS(GRAPH_FILE)
 
 # Empirical (all are identical)
-vetted_graphs <- readRDS(sprintf("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"))
+vetted_graphs <- readRDS(sprintf("~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"))
 emp_graph <- igraph::upgrade_graph(vetted_graphs$anchor)
 rm(vetted_graphs)
 

@@ -15,7 +15,7 @@ ml R/4.2.1-foss-2022a # Adapt to your cluster's R version
 ### PARAMETERS
 
 # Change according to where your data is stored > change for your own path
-GRAPH_FILE="/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds"
+GRAPH_FILE="/scicore/home/chitnis/derkx0000/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds"
 
 # Name of corresponding R script > don't change
 R_SCRIPT="04b_SIS_Factorial.R"

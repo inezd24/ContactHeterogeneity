@@ -29,7 +29,7 @@
 rm(list = ls())
 
 # Set working directory
-setwd("/scicore/home/chitnis/derkx0000/GraphComparison")
+setwd("/scicore/home/chitnis/derkx0000/Derkx2026_publication")
 
 # Load required libraries
 suppressPackageStartupMessages({
@@ -40,7 +40,7 @@ suppressPackageStartupMessages({
 })
 
 # Set local root directory where the simulation folders reside.
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication"
 setwd(LOCAL_ROOT_DIR)
 
 # Set cores
@@ -409,11 +409,11 @@ cat("Task:", TASK_ID, "; Master seed:", MASTER_SEED, "\n")
 # Read file
 # IMPORTANT: see notes at top of script
 if (CURR_TYPE %in% c("Sabaneta", "Habi", "Hepang", "Romana")) {
-  GRAPH_FILE <- paste0("/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens/Graphs/OtherLocations/", CURR_TYPE, "_MASTER_ENSEMBLE_FOR_DM.rds")
-  EMP_FILE <- paste0("/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens/Graphs/OtherLocations/", CURR_TYPE, "_vetted_graphs_task_710_seed_5000.rds")
+  GRAPH_FILE <- paste0("/scicore/home/chitnis/derkx0000/Derkx2026_publication/Net_Sens/Graphs/OtherLocations/", CURR_TYPE, "_MASTER_ENSEMBLE_FOR_DM.rds")
+  EMP_FILE <- paste0("/scicore/home/chitnis/derkx0000/Derkx2026_publication/Net_Sens/Graphs/OtherLocations/", CURR_TYPE, "_vetted_graphs_task_710_seed_5000.rds")
 } else if (CURR_TYPE %in% c("Seed_100", "Seed_1000", "Seed_2000", "Seed_5000")) {
-  GRAPH_FILE <- paste0("/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens/Graphs/", CURR_TYPE, "/MASTER_ENSEMBLE_FOR_DM.rds")
-  EMP_FILE <- paste0("/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens/Graphs/", CURR_TYPE, "/vetted_graphs_task_710_seed_5000.rds")
+  GRAPH_FILE <- paste0("/scicore/home/chitnis/derkx0000/Derkx2026_publication/Net_Sens/Graphs/", CURR_TYPE, "/MASTER_ENSEMBLE_FOR_DM.rds")
+  EMP_FILE <- paste0("/scicore/home/chitnis/derkx0000/Derkx2026_publication/Net_Sens/Graphs/", CURR_TYPE, "/vetted_graphs_task_710_seed_5000.rds")
 } else {
   stop("CURR_TYPE not correct or not given. Please check. Run aborted.\n")
 }

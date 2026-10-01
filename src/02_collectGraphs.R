@@ -27,7 +27,7 @@ library(readr)
 library(data.table)
 
 # Set local root directory 
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication"
 setwd(LOCAL_ROOT_DIR)
 
 # Output folders and paths. 

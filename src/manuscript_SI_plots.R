@@ -37,7 +37,7 @@ library(data.table)
 library(ggpubr)
 
 # Set local root directory 
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publicationn"
 setwd(LOCAL_ROOT_DIR)
 
 # Output folders
@@ -324,9 +324,9 @@ ggsave(plotpath, ks_summary, width = 10, height = 10)
 #-------------------------------------------------------------------------------------------------------------------------
 
 # Load data
-MASTER_ENSEMBLE_FOR_DM <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds")
+MASTER_ENSEMBLE_FOR_DM <- readRDS("~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds")
 all_seeds_between_distributions_5000 <- read_csv("Net_Sens/Graphs/Seed_5000/all_seeds_between_distributions.csv")
-empirical <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
+empirical <- readRDS("~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
 emp_between <- table(round(igraph::betweenness(empirical$anchor), 0))
 emp_between_df <- data.frame(task_id = 1,
                              between  = as.numeric(names(emp_between)),
@@ -497,7 +497,7 @@ ggsave(plotpath, SIS_cases_plot, width = 16, height = 16)
 # Import
 Summary_SIS_ran <- read_csv("Outfiles/Factorial_Summary_SIS_163800000_mseed_100_05June26.csv")
 Summary_SEIR_ran <- read_csv("Outfiles/Factorial_Summary_SEIR_23400000_mseed_100_05June26.csv")
-empirical <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
+empirical <- readRDS("~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
 nodes <- length(V(empirical$anchor))
 
 # SEIR summary
@@ -923,10 +923,10 @@ stroke_pal <- c("#4F6DA0","#344078","#CB8350", "#3B604B", "#C4A27B", "#78343A") 
 
 # Empirical graphs
 empirical_graphs <- list(
-  Sabaneta = readRDS("~/GraphComparison/Net_Sens/Graphs/OtherLocations/Sabaneta_vetted_graphs_task_4933_seed_5000.rds")[[1]],
-  Hepang = readRDS("~/GraphComparison/Net_Sens/Graphs/OtherLocations/Hepang_vetted_graphs_task_4933_seed_5000.rds")[[1]],
-  Habi = readRDS("~/GraphComparison/Net_Sens/Graphs/OtherLocations/Habi_vetted_graphs_task_4933_seed_5000.rds")[[1]],
-  Romana = readRDS("~/GraphComparison/Net_Sens/Graphs/OtherLocations/Romana_vetted_graphs_task_4933_seed_5000.rds")[[1]])
+  Sabaneta = readRDS("~/Derkx2026_publication/Net_Sens/Graphs/OtherLocations/Sabaneta_vetted_graphs_task_4933_seed_5000.rds")[[1]],
+  Hepang = readRDS("~/Derkx2026_publication/Net_Sens/Graphs/OtherLocations/Hepang_vetted_graphs_task_4933_seed_5000.rds")[[1]],
+  Habi = readRDS("~/Derkx2026_publication/Net_Sens/Graphs/OtherLocations/Habi_vetted_graphs_task_4933_seed_5000.rds")[[1]],
+  Romana = readRDS("~/Derkx2026_publication/Net_Sens/Graphs/OtherLocations/Romana_vetted_graphs_task_4933_seed_5000.rds")[[1]])
 
 # Plot the data
 final_plots <- locations %>% 

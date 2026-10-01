@@ -17,7 +17,7 @@
 ### SET UP R ENVIRONMENT ###
 
 # Set working directory
-setwd("/scicore/home/chitnis/derkx0000/GraphComparison")
+setwd("/scicore/home/chitnis/derkx0000/Derkx2026_publication")
 
 # Load libraries
 library(dplyr)

@@ -29,7 +29,7 @@ suppressPackageStartupMessages({
 })
 
 # Set local root directory
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication"
 setwd(LOCAL_ROOT_DIR)
 
 # Set cores for parallel processing
@@ -334,7 +334,7 @@ synthetic_graphs <- readRDS(GRAPH_FILE)
 
 # Empirical
 vetted_graphs <- readRDS(
-  "~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"
+  "~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"
 )
 
 # Combine in list

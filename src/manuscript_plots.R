@@ -33,7 +33,7 @@ library(data.table)
 library(forcats)
 
 # Set local root directory 
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication"
 setwd(LOCAL_ROOT_DIR)
 
 # Output folders
@@ -42,7 +42,7 @@ ifelse(!dir.exists(out_path),
        dir.create(out_path), FALSE)
 
 # Directory of files
-files_directory <- "/scicore/home/chitnis/derkx0000/GraphComparison/Outfiles/"
+files_directory <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication/Outfiles/"
 
 ##########################################################################################################################
 
@@ -110,10 +110,10 @@ find_outbreak_threshold_sensitive <- function(values, adjust_bw) {
 #-------------------------------------------------------------------------------------------------------------------------
 
 # Open ensemble of graphs for seed = 5000
-MASTER_ENSEMBLE_FOR_DM <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds")
+MASTER_ENSEMBLE_FOR_DM <- readRDS("~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/MASTER_ENSEMBLE_FOR_DM.rds")
 
 # All empirical graphs are identical. Choose any task. 
-empirical <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
+empirical <- readRDS("~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
 
 # Save total node number 
 nodes <- length(V(empirical$anchor))
@@ -503,7 +503,7 @@ Summary_SIS_ran <- read_csv("Outfiles/Randomized_Summary_SIS_6000000_mseed_100_0
 Summary_SEIR_ran <- read_csv("Outfiles/Randomized_Summary_SEIR_3000000_mseed_100_01June26.csv")
 
 # Import empirical graph and calculate node total
-empirical <- readRDS("~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
+empirical <- readRDS("~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_3981_seed_5000.rds")
 nodes <- length(V(empirical$anchor))
 
 # SEIR summary

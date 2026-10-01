@@ -22,7 +22,7 @@
 rm(list = ls())
 
 # Set working directory
-setwd("/scicore/home/chitnis/derkx0000/GraphComparison")
+setwd("/scicore/home/chitnis/derkx0000/Derkx2026_publication")
 
 # Load required libraries
 suppressPackageStartupMessages({
@@ -33,7 +33,7 @@ suppressPackageStartupMessages({
 })
 
 # Set local root directory where the simulation folders reside.
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication"
 setwd(LOCAL_ROOT_DIR)
 
 # Set cores
@@ -399,7 +399,7 @@ synthetic_graphs <- readRDS(GRAPH_FILE)
 
 # Empirical (all are identical)
 vetted_graphs <- readRDS(
-  "~/GraphComparison/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"
+  "~/Derkx2026_publication/Net_Sens/Graphs/Seed_5000/vetted_graphs_task_710_seed_5000.rds"
   )
 
 # Combine in list

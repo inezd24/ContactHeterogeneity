@@ -28,7 +28,7 @@ library(readr)
 library(data.table)
 
 # Set local root directory 
-LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/GraphComparison"
+LOCAL_ROOT_DIR <- "/scicore/home/chitnis/derkx0000/Derkx2026_publication"
 setwd(LOCAL_ROOT_DIR)
 
 # Output folders and paths. 
@@ -503,7 +503,7 @@ mh_distance <- function(path, graph_types, graph_pattern){
 ## Step 1: set up for graph examination
 
 # Set file directory 
-file_dir = "/scicore/home/chitnis/derkx0000/GraphComparison/Net_Sens"
+file_dir = "/scicore/home/chitnis/derkx0000/Derkx2026_publication/Net_Sens"
 
 # Colour palette
 palette_paper <- c("#3A405A", "#FF8465", "#99B2DD", "#FCD2A2", "#A26F39", "#5C8A6F")
