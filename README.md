@@ -21,11 +21,12 @@ GraphComparison/
 ├── README.md
 ├── LICENSE
 ├── .gitignore
+├── renv.lock # information about the full project environment
 ├── GraphComparison.Rproj
 ├── data/
 │   └── README.md            # what input data the pipeline expects (not included; see Data availability)
 └── src/
-    ├── 00_constructNetworksFunction.R   # reference copy of shared helper functions
+    ├── 00_constructNetworksFunction.R   
     ├── 01_NetworkGeneratorComparison.R/.sh
     ├── 01a_Run_NCRG.R/.sh
     ├── 02_collectGraphs.R
@@ -33,8 +34,8 @@ GraphComparison/
     ├── 03b_SEIR_Factorial.R/.sh
     ├── 04a_SIS_Randomized.R/.sh
     ├── 04b_SIS_Factorial.R/.sh
-    ├── 06_Graphs_Other_Locations.R/.sh
-    ├── 07_collectGraphsOtherLocations.R
+    ├── 05_Graphs_Other_Locations.R/.sh
+    ├── 06_collectGraphsOtherLocations.R
     ├── manuscript_plots.R
     └── manuscript_SI_plots.R
 ```
