@@ -69,7 +69,7 @@ All scripts were run under:
 
 - **R 4.2.1** (`R/4.2.1-foss-2022a` environment module)
 - Cluster: scicore (sciCORE HPC, University of Basel), SLURM workload manager
-- You can find the corresponding renv.lock file in this directory with information about all packages used in the .Rproject.
+- You can find the corresponding `renv.lock` file in this directory with information about all packages used in the .Rproject.
 - If you clone this repository, you can simply run `renv::restore()` or `renv::restore(lockfile = "path/to/renv.lock")` using the `renv` R package to recreate the environment.
 
 ## Adapting paths to your own system
