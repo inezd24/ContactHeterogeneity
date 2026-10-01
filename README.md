@@ -12,7 +12,8 @@ This repository contains the analysis scripts exactly as they were run on my HPC
 
 1. All analyses for the original manuscript were run on University of Basel's sciCORE HPC using SLURM. Both the .R and .sh files are included in this repository.
 2. The scripts contain **hardcoded, machine-specific paths** to my HPC account (see [Adapting paths to your own system](#adapting-paths-to-your-own-system)). These must be edited by anyone who wants to actually *execute* the pipeline elsewhere. Editing these paths does not change any computation; it only tells R and SLURM where to read/write files. I intentionally left this for the user to adapt to keep the code as identical to its original state.
-3. All .R scripts contain there own notes in the header. Please make sure to read these prior to execution. 
+3. All .R scripts contain there own notes in the header. Please make sure to read these prior to execution.
+4. IMPORTANT: the run_pipeline.sh script was added for your convenience. It was not used in the actual generation of manuscript results, where the pipeline was run using each script independently. The most trusted way of replicating results would therefore be to run each script separately, however running the full pipeline with the .sh script should not produce any errors. 
 
 ## Repository structure
 
@@ -26,7 +27,6 @@ GraphComparison/
 ├── data/
 │   └── README.md                             # What input data the pipeline expects (not included; see Data availability)
 └── src/
-    ├── run_pipeline.sh                       # This runs all scripts (01-06) in a single pipeline
     ├── 00_constructNetworksFunction.R   
     ├── 01_NetworkGeneratorComparison.R/.sh
     ├── 01a_Run_NCRG.R/.sh
@@ -37,8 +37,11 @@ GraphComparison/
     ├── 04b_SIS_Factorial.R/.sh
     ├── 05_Graphs_Other_Locations.R/.sh
     ├── 06_collectGraphsOtherLocations.R
+    ├── outbreak_threshold_sensitivity.R
     ├── manuscript_plots.R
-    └── manuscript_SI_plots.R
+    ├── manuscript_SI_plots.R
+    └── run_pipeline.sh                       # This runs all scripts (01-06) in a single pipeline
+
 ```
 
 Each `.R`/`.sh` pair is kept **in the same folder** on purpose: the SLURM scripts call `Rscript <script_name>.R` using a bare filename, which only resolves correctly if the shell script is submitted (`sbatch`) from inside the same directory the `.R` file lives in. This is why they are not separated into an 'src/' and 'slurm/' folder. 
@@ -59,6 +62,7 @@ Step numbers match the file name prefixes as provided. Scripts without a `.sh` f
 | 4b | `04b_SIS_Factorial.R/.sh` | SIS simulations, factorial design. | 0–9999 |
 | 5 | `05_Graphs_Other_Locations.R/.sh` | Repeats the Step 1 network-generation comparison for the three additional empirical locations. | 1–5000 |
 | 6 | `06_collectGraphsOtherLocations.R` | Aggregates Step 5's outputs across the additional locations (companion to Step 2). | — (single run) |
+| - | `outbreak_threshold_sensitivity.R` | Performs sensitivity analysis of outbreak threshold identification. | — (single run) |
 | — | `manuscript_plots.R` | Generates the main-text manuscript figures from the pipeline outputs above. | — |
 | — | `manuscript_SI_plots.R` | Generates the Supplementary Information figures. | — |
 | — | `run_pipeline.sh` | This .sh script runs the whole pipeline (01-06, but not 00 as this is sourced separately in the R scripts) in a single go | — |
@@ -76,19 +80,20 @@ All scripts were run under:
 
 Every script sets an absolute working directory before doing anything else, and several also hardcode an HPC library path or input-data path. To run these scripts on a different machine, update the following (line numbers refer to the files as provided):
 
-| File | Line(s) | What's hardcoded |
+| File | What's hardcoded |
 |---|---|---|
-| `01_NetworkGeneratorComparison.R` | 20, 33 | `.libPaths(...)`; `LOCAL_ROOT_DIR` |
-| `01a_Run_NCRG.R` | 20, 33 | `.libPaths(...)`; `LOCAL_ROOT_DIR` |
-| `02_collectGraphs.R` | 30 | `LOCAL_ROOT_DIR` |
-| `03a_SEIR_Randomized.R` | 26, 268–272 | `LOCAL_ROOT_DIR`; absolute `GRAPH_FILE`/`EMP_FILE` paths |
-| `03b_SEIR_Factorial.R` | 25 | `LOCAL_ROOT_DIR` (`GRAPH_FILE` is passed in from the `.sh` script instead) |
-| `04a_SIS_Randomized.R` | 26, 257 | `LOCAL_ROOT_DIR`; a hardcoded `vetted_graphs_...rds` fallback path |
-| `04b_SIS_Factorial.R` | 25 | `LOCAL_ROOT_DIR` (`GRAPH_FILE` passed in from the `.sh` script) |
-| `05_Graphs_Other_Locations.R` | 20, 35 | `.libPaths(...)`; `LOCAL_ROOT_DIR` |
-| `06_collectGraphsOtherLocations.R` | 3 | `file_dir` |
-| `manuscript_plots.R` | 37, 46 | `LOCAL_ROOT_DIR`; `files_directory` |
-| `manuscript_SI_plots.R` | 38 | `LOCAL_ROOT_DIR` |
+| `01_NetworkGeneratorComparison.R` | `.libPaths(...)`; `LOCAL_ROOT_DIR` |
+| `01a_Run_NCRG.R` | `.libPaths(...)`; `LOCAL_ROOT_DIR` |
+| `02_collectGraphs.R` | `LOCAL_ROOT_DIR` |
+| `03a_SEIR_Randomized.R` | `LOCAL_ROOT_DIR`; absolute `GRAPH_FILE`/`EMP_FILE` paths |
+| `03b_SEIR_Factorial.R` | `LOCAL_ROOT_DIR` (`GRAPH_FILE` is passed in from the `.sh` script instead) |
+| `04a_SIS_Randomized.R` | `LOCAL_ROOT_DIR`; a hardcoded `vetted_graphs_...rds` fallback path |
+| `04b_SIS_Factorial.R` | `LOCAL_ROOT_DIR` (`GRAPH_FILE` passed in from the `.sh` script) |
+| `05_Graphs_Other_Locations.R` | `.libPaths(...)`; `LOCAL_ROOT_DIR` |
+| `06_collectGraphsOtherLocations.R` | `file_dir` |
+| `outbreak_threshold_sensitivity.R` | `LOCAL_ROOT_DIR`,`IN_FILE` |
+| `manuscript_plots.R` | `LOCAL_ROOT_DIR`; `files_directory` |
+| `manuscript_SI_plots.R` | `LOCAL_ROOT_DIR` |
 
 In addition, several scripts (`01_NetworkGeneratorComparison.R`, `01a_Run_NCRG.R`, `manuscript_plots.R`, `manuscript_SI_plots.R`) read a base empirical dataset from `~/BaseData/Chad/ServerData.rds` or the equivalent for the other three locations — see [`data/README.md`](data/README.md). The `.sh` files also hardcode `#SBATCH --output`/`--error` log paths under `/scicore/.../GraphComparison/SLURM/`, which you'll want to point at your own cluster account.
 
