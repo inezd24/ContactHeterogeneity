@@ -49,8 +49,7 @@ Step numbers match the file name prefixes as provided. Scripts without a `.sh` f
 
 | Step | Script(s) | What it does | SLURM array |
 |---|---|---|---|
-| — | `00_constructNetworksFunction.R` (+ `.RData`) | Reference/master copy of the shared helper functions (`empirical_net`, `construct_network`, `generate_sbm_graph`, `generate_dcsbm_graph`, `grid_optimization`, `construct_five_networks`, `compare_ks_distances`, etc.). Not run directly — these functions are copy-pasted into the scripts below so each SLURM array task is self-contained without a `source()` call. You are welcome to adapt this, hence they are included as such. | — |
-| 0 | `run_pipeline.sh` | This .sh script runs the whole pipeline (01-06, but not 00 as this is sourced separately in the R scripts) in a single go | — |
+| 0 | `00_constructNetworksFunction.R` (+ `.RData`) | Reference/master copy of the shared helper functions (`empirical_net`, `construct_network`, `generate_sbm_graph`, `generate_dcsbm_graph`, `grid_optimization`, `construct_five_networks`, `compare_ks_distances`, etc.). Not run directly — these functions are copy-pasted into the scripts below so each SLURM array task is self-contained without a `source()` call. You are welcome to adapt this, hence they are included as such. | — |
 | 1 | `01_NetworkGeneratorComparison.R/.sh` | For the primary ("Chad") location: generates and compares the five synthetic network types against the empirical network via grid-search parameter optimization and K-S distance. | 1–5000 |
 | 1a | `01a_Run_NCRG.R/.sh` | Reruns/patches the NCRG (Newman) generator for each seed produced in Step 1. | 1–5000 |
 | 2 | `02_collectGraphs.R` | Aggregates the per-seed outputs of Steps 1 and 1a into the master ensemble of vetted graphs and summary tables used downstream. | — (single run) |
@@ -62,6 +61,7 @@ Step numbers match the file name prefixes as provided. Scripts without a `.sh` f
 | 7 | `06_collectGraphsOtherLocations.R` | Aggregates Step 5's outputs across the additional locations (companion to Step 2). | — (single run) |
 | — | `manuscript_plots.R` | Generates the main-text manuscript figures from the pipeline outputs above. | — |
 | — | `manuscript_SI_plots.R` | Generates the Supplementary Information figures. | — |
+| — | `run_pipeline.sh` | This .sh script runs the whole pipeline (01-06, but not 00 as this is sourced separately in the R scripts) in a single go | — |
 
 ## Software environment
 
