@@ -57,7 +57,7 @@ out_path_graphs <- file.path(out_path, "Graphs")
 
 ##########################################################################################################################
 
-### Load all helper functions (1-9)
+### Load all helper functions (1-15)
 
 # All functions are stored in this R script and corresponding .Rdata file: "HelperFunctions.RData"
 source("00_constructNetworksFunction.R")

@@ -40,6 +40,8 @@ ifelse(!dir.exists(file.path(out_path, "Plots")),
 
 ### Helper functions
 
+# Use these functions instead of the ones in script 00, they have been adapted. 
+
 #-------------------------------------------------------------------------------------------------------------------------
 # 1. Function to summarize graphs
 summarize_graphs <- function(path,
