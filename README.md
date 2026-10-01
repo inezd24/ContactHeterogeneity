@@ -57,8 +57,8 @@ Step numbers match the file name prefixes as provided. Scripts without a `.sh` f
 | 3b | `03b_SEIR_Factorial.R/.sh` | SEIR simulations under a full factorial parameter design. | 0–9999 |
 | 4a | `04a_SIS_Randomized.R/.sh` | SIS outbreak simulations, randomly sampled parameters. | 0–999 |
 | 4b | `04b_SIS_Factorial.R/.sh` | SIS simulations, factorial design. | 0–9999 |
-| 6 | `05_Graphs_Other_Locations.R/.sh` | Repeats the Step 1 network-generation comparison for the three additional empirical locations. | 1–5000 |
-| 7 | `06_collectGraphsOtherLocations.R` | Aggregates Step 5's outputs across the additional locations (companion to Step 2). | — (single run) |
+| 5 | `05_Graphs_Other_Locations.R/.sh` | Repeats the Step 1 network-generation comparison for the three additional empirical locations. | 1–5000 |
+| 6 | `06_collectGraphsOtherLocations.R` | Aggregates Step 5's outputs across the additional locations (companion to Step 2). | — (single run) |
 | — | `manuscript_plots.R` | Generates the main-text manuscript figures from the pipeline outputs above. | — |
 | — | `manuscript_SI_plots.R` | Generates the Supplementary Information figures. | — |
 | — | `run_pipeline.sh` | This .sh script runs the whole pipeline (01-06, but not 00 as this is sourced separately in the R scripts) in a single go | — |
