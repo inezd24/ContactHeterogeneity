@@ -1,5 +1,8 @@
 # README
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://zenodo.org/badge/1370138970.svg)](https://doi.org/10.5281/zenodo.23156704)
+
 Code accompanying the manuscript '*Contact heterogeneity in network reconstruction: evaluating synthetic graph generators for rabies transmission modeling*', which compares five synthetic network generators (SBM, DCSBM, ERM, NCRG, SENCA from Laager et al., 2018) against empirical dog-contact networks from four locations, and evaluating how well each generator reproduces rabies (SEIR) and generic (SIS) outbreak dynamics on those networks. This manuscript has been submitted to *PLOS Computational Biology*. DOI:
 
 **Code author:** Inez Derkx (inez.derkx@swisstph.ch)
