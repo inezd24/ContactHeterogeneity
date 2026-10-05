@@ -1,4 +1,4 @@
-# README
+# Modeling Contact Heterogeneity for Network-Based Rabies Modeling
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DOI](https://zenodo.org/badge/1370138970.svg)](https://doi.org/10.5281/zenodo.23156704)
