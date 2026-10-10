@@ -74,9 +74,9 @@ max_seed = 5000 # adapt this where needed
 
 ## 2. Load data  
 
-# The edgelist is stored in ServerData.rds as a dataframe called 'dog_contact_zone_1'
+# The edgelist is stored in Chad_NDjamena.rds as a dataframe called 'dog_contact_zone_1'
 # If you have your data stored differently or elsewhere, adapt the following:
-ServerData <- readRDS("~/BaseData/Chad/ServerData.rds")
+ServerData <- readRDS("~/BaseData/Chad/Chad_NDjamena.rds")
 if (!exists("ServerData")) {
   stop("Error: The 'ServerData' object was not loaded from ServerData.rds.")
 }

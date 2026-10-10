@@ -20,9 +20,9 @@
 #    Ensure that you check this in the 01_NetworkGeneratorComparison.sh script (lines 3-4). 
 # 8. You can also adapt the memory, CPUs and allocated time in the .sh script, primarily depending on the your array size
 #    and the parameter grid size, as the latter requires a significant amount of memory. 
-# 9. The data is stored within country and location specific folders. It would be easiest to follow this set-up for 
-#    script execution. They are within a BaseData folder stored as "Country_Location", e.g. "Indonesia_Habi".
-
+# 9. The data is stored as one ready-made edge list per location, saved as an .rds file named "Country_Location.rds",
+#    e.g. "Indonesia_Habi.rds". The script looks for it directly in FILE_DIR, and otherwise in FILE_DIR/Country_Location/.
+#    The edge list should have the columns 'dog' and 'peer'; if not, the first two columns are used as the edge list.
 
 ##########################################################################################################################
 
@@ -78,83 +78,72 @@ ifelse(!dir.exists(out_path_graphs),
 ### Loading helper functions
 
 #-------------------------------------------------------------------------------------------------------------------------
-# Helper function 1: open and reads files in data folder
-read_and_validate_file <- function(file_path, col_names) {
-
-  # This function reads files in file path
-  #' @param file_path: path of files storage
-  #' @param col_names: the names of columns in csv file
+# Helper function 1: load the ready-made edge list from 'Country_Location.rds'
+load_edgelist_rds <- function(country, location, folder_dir){
   
-  # Get basename of files
-  file_name <- basename(file_path)
-    
-  # Read the CSV, skipping the header (row 1). 
-  # Using show_col_types = FALSE suppresses messages
-  data <- read_csv(file_path, col_names = col_names, skip = 1, show_col_types = FALSE)
-    
-  # Check if the resulting tibble has any data rows
-  if (nrow(data) > 0) {
-    
-    # If data exists, add the source file name and return it
-    return(mutate(data, source_file = file_name))
-  } 
-  else {
-    # If only the header was present (0 rows of data), return NULL and print a message
-    message(paste("Warning: File", file_name, "was skipped as it contained only a header (0 data rows)."))
-    return(NULL)
+  # This function reads the pre-built edge list for one location
+  #' @param country: country name as used in the file name (e.g. "Indonesia")
+  #' @param location: location name as used in the file name (e.g. "Habi")
+  #' @param folder_dir: directory containing the .rds file (or its Country_Location subfolder)
+  #' @return a dataframe edge list with columns 'dog' and 'peer'
+  
+  ## Step 1: locate the file
+  
+  # File name follows "Country_Location.rds"
+  file_name <- paste0(country, "_", location, ".rds")
+  
+  # Look directly in folder_dir first, then in the Country_Location subfolder
+  candidate_paths <- c(file.path(folder_dir, file_name),
+                       file.path(folder_dir, paste0(country, "_", location), file_name))
+  rds_path <- candidate_paths[file.exists(candidate_paths)][1]
+  
+  if (is.na(rds_path)) {
+    stop(paste0("Edge list file not found. Looked for:\n  ", paste(candidate_paths, collapse = "\n  ")))
   }
-}
-#-------------------------------------------------------------------------------------------------------------------------
-
-#-------------------------------------------------------------------------------------------------------------------------  
-# Helper function 2: Open data frames
-open_data_create_edgelist <- function(data_folder, folder_dir, col_names, file_pattern){
-
-  # This function takes all csv files with data and uses it to create an edge list
-  #' @param data_folder: name of folder where the .csv files are stored
-  #' @param folder_dir: the directory of the folder
-  #' @param col_names: the names of columns in csv file
-  #' @param file_pattern: the pattern to recognize the file for selecting only desired files
-  #' @return a dataframe edge list
-
-  ## Step 1: identify files
-
-  # Set file path
-  filepath <- file.path(folder_dir, data_folder)
+  cat("\nLoading edge list from:", rds_path, "\n")
   
-  # List all files matching the pattern "D<number>_clean.csv"
-  all_files <- list.files(
-    path = filepath,
-    pattern = file_pattern,
-    full.names = TRUE)
+  ## Step 2: read and standardise
   
-  # Read all files, filter out empty ones, and combine (using helper function 1)
-  combined_data_list <- map(all_files, read_and_validate_file, col_names = col_names)
+  edge_obj <- readRDS(rds_path)
   
-  # Remove all NULL elements (the skipped files)
-  data_list_cleaned <- purrr::compact(combined_data_list)
-  if (length(data_list_cleaned) == 0) {
-    stop("No valid data rows found across all files after filtering. Check file contents.")
+  # If the file holds an igraph object instead of a data frame, extract its edges
+  if (inherits(edge_obj, "igraph")) {
+    edge_obj <- igraph::as_data_frame(edge_obj, what = "edges")
   }
   
-  # bind_rows combines the list of data frames into a single one.
-  combined_data_raw <- bind_rows(data_list_cleaned)
+  edge_df <- as.data.frame(edge_obj, stringsAsFactors = FALSE)
   
-  # Turn into edgelist
-  edge_list_df <- combined_data_raw %>%
-    select(name, peerId2) %>%
-    filter(name != peerId2) %>% # remove self loops
-    unique() %>%
-    rename(dog = name, peer = peerId2)
+  if (ncol(edge_df) < 2) {
+    stop("Edge list must have at least two columns (dog, peer).")
+  }
+  
+  # Use 'dog' and 'peer' if present; otherwise take the first two columns
+  if (!all(c("dog", "peer") %in% names(edge_df))) {
+    message(paste0("Columns 'dog' and 'peer' not found (found: ", paste(names(edge_df), collapse = ", "),
+                   "). Using the first two columns as the edge list."))
+    edge_df <- edge_df[, 1:2]
+    names(edge_df) <- c("dog", "peer")
+  }
+  
+  # Same cleaning as the old CSV route: drop self loops and duplicate rows
+  edge_list_df <- edge_df %>%
+    select(dog, peer) %>%
+    filter(dog != peer) %>%
+    distinct()
+  
+  if (nrow(edge_list_df) == 0) {
+    stop("Edge list contains no valid edges after removing self loops.")
+  }
+  
+  cat("Edge list loaded:", nrow(edge_list_df), "edges.\n")
   
   # Return df with edgelist 
   return(edge_list_df)
-  
 }
 #-------------------------------------------------------------------------------------------------------------------------
-
+ 
 #-------------------------------------------------------------------------------------------------------------------------
-# Helper function 3: construct five networks (NOTE: incl. NCRG)
+# Helper function 2: construct five networks (NOTE: incl. NCRG)
 construct_five_networks <- function(empirical_edgelist, 
                                     square_edge_size = 1,
                                     kappa_grid, 
@@ -392,52 +381,44 @@ source("00_constructNetworksFunction.R")
 
 ##########################################################################################################################
 
+ 
 ### Execute code
-
+ 
 ## 1. Set up arguments and seeding from .sh script
-
+ 
 # Set arguments
 args <- commandArgs(trailingOnly = TRUE)
-
+ 
 # The SLURM script passes: SEED, COUNTRY, LOCATION, FILE_DIR
 if (length(args) < 4) {
   stop("Usage: Rscript 9_Graphs_Other_Locations.R <SEED> <COUNTRY> <LOCATION> <FILE_DIR>", call. = FALSE)
 }
-
+ 
 # Assign arguments
 TASK_ID  <- as.numeric(args[1]) # This is the SEED/Array ID
 COUNTRY  <- as.character(args[2])
 LOCATION <- as.character(args[3])
-FILE_DIR <- as.character(args[4])
-
+FILE_DIR <- as.character(args[4]) # Directory holding the Country_Location.rds files
+ 
 # Set seed using task id
 base_seed <- 1000 + (TASK_ID * 10000) # Give each task 10,000 "room"
 max_seed = 5000 # adapt
-
-
+ 
+ 
 ## 2. Load data
-
-
-# Set general col names and file pattern
-col_names_contact_file <- c("name","deviceNr","deviceId","timestamp","peerId","rssi","TIME","peerId2")
-
-# Set file pattern
-file_pattern <- "^D[0-9]+_clean\\.csv$"
-
-# Set data folder with country and location
-data_folder <- paste0(COUNTRY, "_", LOCATION)
-
-# Create edgelist using helper function 1
-edgelist <- open_data_create_edgelist(data_folder, FILE_DIR, col_names_contact_file, file_pattern)
+ 
+ 
+# Load the ready-made edge list from 'Country_Location.rds' using helper function 1
+edgelist <- load_edgelist_rds(COUNTRY, LOCATION, FILE_DIR)
   
-
+ 
 ## 3. Runs and replicates
-
-
+ 
+ 
 # Generate empty lists
 replicate_results <- list()
 total_graphs_list <- list()
-
+ 
 # Create graph replicates for each seed
 for (r in 1:5) {
   
@@ -448,7 +429,7 @@ for (r in 1:5) {
   
   # Set max lambda
   current_lambda_max <- 18
-
+ 
   # Don't let it drop below the start of your grid
   floor_lambda <- 3  
   success <- FALSE
@@ -484,7 +465,7 @@ for (r in 1:5) {
   if (!success) {
     stop("Network construction failed even after scaling Lambda down to minimum.")
   }
-
+ 
   
   # Extract all objects from output list
   graphs_to_process <- results_from_func$graph_list
@@ -523,11 +504,11 @@ for (r in 1:5) {
     replicate_results[[length(replicate_results) + 1]] <- metrics
   }
 }
-
-
+ 
+ 
 ## 4. Bind summary statistics for evaluating the graph generators
-
-
+ 
+ 
 # Bind results (df contains all replicates)
 if (length(replicate_results) > 0) {
   output_df <- do.call(rbind, replicate_results)
@@ -544,11 +525,11 @@ if (length(replicate_results) > 0) {
   # Report if not results generated
   cat("\nError: No results were generated. Check construct_five_networks logic.\n")
 }
-
-
+ 
+ 
 ## 5. Check validity of results
-
-
+ 
+ 
 # Stability Check: Variance across replicates should be 0
 stability_check <- output_df %>%
   dplyr::group_by(Seed, Graph) %>%
@@ -558,7 +539,7 @@ stability_check <- output_df %>%
                    SD_optL = sd(Opt_Lambda),
                    SD_optK = sd(Opt_Kappa),
                    SD_optT = sd(Opt_Tau))
-
+ 
 # Report stability check
 if(sum(stability_check$SD_Degree, na.rm = TRUE) == 0 &&
    sum(stability_check$SD_Bet, na.rm = TRUE) == 0 &&
@@ -570,13 +551,13 @@ if(sum(stability_check$SD_Degree, na.rm = TRUE) == 0 &&
 } else {
   cat("WARNING: Stochastic leakage detected. Check seed offsets.\n")
 }
-
+ 
 # For conditional use:
 stability_sum <- sum(stability_check$SD_Degree, stability_check$SD_Bet, 
                      stability_check$SD_Edges, stability_check$SD_optL, 
                      stability_check$SD_optK, stability_check$SD_optT, 
                      na.rm = TRUE)
-
+ 
 # Save stability check for needing replicates or not 
 is_stable <- (stability_sum == 0)
 if(is_stable){
@@ -610,8 +591,7 @@ if(is_stable){
   cat("CRITICAL WARNING: Stochastic leakage detected (SD > 0).\n")
   cat("The replicates are NOT identical. Extraction aborted.\n")
 }
-
-
-
+ 
+ 
+ 
 ### End of script
-
